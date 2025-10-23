@@ -504,8 +504,6 @@ PDO SQLite 扩展已启用
 - [使用手册](USAGE.md) - 完整的功能使用指南
 - [API 使用指南](API_USAGE_GUIDE.md) - 第三方客户端配置说明
 - [API 文档](API_DOCUMENTATION.md) - 完整 API 接口文档
-- [依赖说明](DEPENDENCIES.md) - 本地化依赖详细信息
-- [依赖本地化报告](VENDOR_LOCALIZATION.md) - 完整的本地化状态报告
 
 ## 🔐 安全建议
 

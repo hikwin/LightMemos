@@ -5,6 +5,41 @@
     box-sizing: border-box;
 }
 
+/* 统计页面样式 */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.stat-card {
+    text-align: center;
+    padding: 20px;
+    background: var(--background);
+    border-radius: 8px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stat-number {
+    font-size: 32px;
+    font-weight: bold;
+    color: var(--primary-color);
+    line-height: 1;
+}
+
+.stat-label {
+    color: var(--text-muted);
+    margin-top: 8px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
 /* 编辑按钮样式 */
 .edit-actions {
     display: flex;
@@ -1992,6 +2027,29 @@ body {
 }
 
 @media (max-width: 768px) {
+    /* 统计页面手机端样式 */
+    .stats-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+    
+    .stat-card {
+        padding: 15px 8px;
+        border-radius: 6px;
+    }
+    
+    .stat-number {
+        font-size: 24px;
+        font-weight: bold;
+    }
+    
+    .stat-label {
+        font-size: 12px;
+        margin-top: 6px;
+        font-weight: 500;
+    }
+    
     /* 显示移动端顶部导航栏 */
     .mobile-header {
         display: flex;

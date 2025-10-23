@@ -109,6 +109,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['install'])) {
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 last_login DATETIME
             );
+            
+            CREATE TABLE shares (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                token TEXT UNIQUE NOT NULL,
+                memo_id INTEGER NOT NULL,
+                encrypted INTEGER NOT NULL DEFAULT 0,
+                passcode_hash TEXT,
+                expires_at TEXT,
+                max_visits INTEGER,
+                visit_count INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                FOREIGN KEY (memo_id) REFERENCES memos(id) ON DELETE CASCADE
+            );
+            
+            CREATE TABLE api_tokens (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token TEXT UNIQUE NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT,
+                expires_at DATETIME,
+                last_used_at DATETIME,
+                is_active INTEGER DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            );
         ");
         
         // 插入默认设置

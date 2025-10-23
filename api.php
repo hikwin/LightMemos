@@ -2031,6 +2031,20 @@ function validateApiToken($db) {
 
 // 处理 API Tokens 列表和创建
 function handleApiTokens($db, $method) {
+    // 确保 api_tokens 表存在
+    $db->exec("CREATE TABLE IF NOT EXISTS api_tokens (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        token TEXT UNIQUE NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        expires_at DATETIME,
+        last_used_at DATETIME,
+        is_active INTEGER DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )");
+    
     if ($method === 'GET') {
         // 获取当前用户的所有 tokens
         $userId = $_SESSION['user_id'];

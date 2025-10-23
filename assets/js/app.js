@@ -113,12 +113,41 @@ document.addEventListener('DOMContentLoaded', function() {
         attachmentPerPage = parseInt(savedPerPage);
     }
     
-    loadMemos('', false); // 明确指定append = false
+    // 根据 URL 哈希初始化页面
+    const initialView = getViewFromHash();
+    currentView = initialView;
+    
+    // 更新导航状态
+    updateNavigationState(initialView);
+    
+    // 加载对应页面内容
+    handleViewChange(initialView);
+    
     loadTags();
     setupEventListeners();
     initCalendar();
     setupInfiniteScroll();
     setupCalendarClickOutside();
+    
+    // 监听浏览器前进后退按钮
+    window.addEventListener('popstate', function(event) {
+        const view = getViewFromHash();
+        if (view !== currentView) {
+            currentView = view;
+            updateNavigationState(view);
+            handleViewChange(view, false); // 不更新URL，避免循环
+        }
+    });
+    
+    // 监听哈希变化（用于直接修改 URL 的情况）
+    window.addEventListener('hashchange', function(event) {
+        const view = getViewFromHash();
+        if (view !== currentView) {
+            currentView = view;
+            updateNavigationState(view);
+            handleViewChange(view, false); // 不更新URL，避免循环
+        }
+    });
 });
 
 // 初始化发布区 Vditor
@@ -588,9 +617,14 @@ function setupEventListeners() {
 }
 
 // 处理视图切换
-function handleViewChange(view) {
+function handleViewChange(view, updateUrl = true) {
     currentView = view;
     const contentArea = document.querySelector('.content-area');
+    
+    // 更新 URL 哈希（仅在非哈希变化触发时）
+    if (updateUrl) {
+        updateUrlHash(view);
+    }
     
     // 重置分页状态
     currentPage = 1;
@@ -612,6 +646,50 @@ function handleViewChange(view) {
         case 'settings':
             loadSettings();
             break;
+    }
+}
+
+// 更新 URL 哈希
+function updateUrlHash(view) {
+    const hashMap = {
+        'timeline': '#timeline',
+        'attachments': '#attachments', 
+        'stats': '#stats',
+        'shares': '#shares',
+        'settings': '#settings'
+    };
+    
+    const hash = hashMap[view] || '#timeline';
+    if (window.location.hash !== hash) {
+        window.history.pushState(null, '', hash);
+    }
+}
+
+// 从 URL 哈希获取视图
+function getViewFromHash() {
+    const hash = window.location.hash;
+    const hashToView = {
+        '#timeline': 'timeline',
+        '#attachments': 'attachments',
+        '#stats': 'stats', 
+        '#shares': 'shares',
+        '#settings': 'settings'
+    };
+    
+    return hashToView[hash] || 'timeline';
+}
+
+// 更新导航状态
+function updateNavigationState(view) {
+    // 移除所有导航项的激活状态
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    
+    // 激活对应的导航项
+    const navItem = document.querySelector(`[data-view="${view}"]`);
+    if (navItem) {
+        navItem.classList.add('active');
     }
 }
 
@@ -1762,9 +1840,10 @@ async function editInPlace(id) {
                     height: 400, // 增加高度到400px
                     mode: 'ir', // 即时渲染模式
                     value: memo.content,
-                    placeholder: '编辑笔记内容...',
+                    placeholder: '编辑笔记内容... (Ctrl+Enter 保存)',
                     cdn: './assets/vendor/vditor', // 使用相对路径加载本地资源
                     lang: 'zh_CN', // 指定中文语言包
+                    ctrlEnter: () => saveEditInPlace(id), // Ctrl+Enter 保存
                     hint: {
                         emoji: getEmojiConfig()
                     },
@@ -1843,7 +1922,18 @@ async function editInPlace(id) {
             } else {
                 // 如果 Vditor 未加载，使用普通 textarea
                 const vditorDiv = document.getElementById(`vditor-${id}`);
-                vditorDiv.innerHTML = `<textarea id="vditor-textarea-${id}" style="width: 100%; height: 400px; border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; resize: vertical;">${memo.content}</textarea>`;
+                vditorDiv.innerHTML = `<textarea id="vditor-textarea-${id}" style="width: 100%; height: 400px; border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; resize: vertical;" placeholder="编辑笔记内容... (Ctrl+Enter 保存)">${memo.content}</textarea>`;
+                
+                // 为 textarea 添加 Ctrl+Enter 快捷键
+                const textarea = document.getElementById(`vditor-textarea-${id}`);
+                if (textarea) {
+                    textarea.addEventListener('keydown', function(e) {
+                        if (e.ctrlKey && e.key === 'Enter') {
+                            e.preventDefault();
+                            saveEditInPlace(id);
+                        }
+                    });
+                }
             }
         }
     } catch (error) {
@@ -1930,6 +2020,9 @@ async function saveEditInPlace(id) {
             
             // 重新添加代码块复制按钮
             addCopyButtonsToCodeBlocks(card);
+
+            // 重新为待办事项的复选框添加点击事件（保存后可直接勾选更新）
+            enableTodoCheckboxes(card, { id });
             
             // 清理存储的原始内容和编辑状态
             delete card.dataset.originalContent;
@@ -1948,6 +2041,9 @@ function cancelEditInPlace(id) {
     const originalContent = card.dataset.originalContent;
     contentDiv.innerHTML = originalContent;
     
+    // 恢复原内容后，确保待办复选框可点击并可更新状态
+    enableTodoCheckboxes(card, { id });
+
     // 清理存储的原始内容和编辑状态
     delete card.dataset.originalContent;
     delete card.dataset.editing;
@@ -3040,43 +3136,43 @@ async function loadStats() {
             // 写作热图
             html += generateWritingHeatmap(stats.daily_stats);
             
-            html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px;">';
+            html += '<div class="stats-grid">';
             html += `
-                <div style="text-align: center; padding: 20px; background: var(--background); border-radius: 8px;">
-                    <div style="font-size: 32px; font-weight: bold; color: var(--primary-color);">${stats.usage_days || 0}</div>
-                    <div style="color: var(--text-muted); margin-top: 5px;">使用天数</div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.usage_days || 0}</div>
+                    <div class="stat-label">使用天数</div>
                 </div>
-                <div style="text-align: center; padding: 20px; background: var(--background); border-radius: 8px;">
-                    <div style="font-size: 32px; font-weight: bold; color: var(--primary-color);">${stats.record_days || 0}</div>
-                    <div style="color: var(--text-muted); margin-top: 5px;">记录天数</div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.record_days || 0}</div>
+                    <div class="stat-label">记录天数</div>
                 </div>
-                <div style="text-align: center; padding: 20px; background: var(--background); border-radius: 8px;">
-                    <div style="font-size: 32px; font-weight: bold; color: var(--primary-color);">${stats.consecutive_days || 0}</div>
-                    <div style="color: var(--text-muted); margin-top: 5px;">连续记录</div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.consecutive_days || 0}</div>
+                    <div class="stat-label">连续记录</div>
                 </div>
-                <div style="text-align: center; padding: 20px; background: var(--background); border-radius: 8px;">
-                    <div style="font-size: 32px; font-weight: bold; color: var(--primary-color);">${stats.total_memos}</div>
-                    <div style="color: var(--text-muted); margin-top: 5px;">总笔记数</div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.total_memos}</div>
+                    <div class="stat-label">总笔记数</div>
                 </div>
-                <div style="text-align: center; padding: 20px; background: var(--background); border-radius: 8px;">
-                    <div style="font-size: 32px; font-weight: bold; color: var(--primary-color);">${stats.total_tags}</div>
-                    <div style="color: var(--text-muted); margin-top: 5px;">总标签数</div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.total_tags}</div>
+                    <div class="stat-label">总标签数</div>
                 </div>
-                <div style="text-align: center; padding: 20px; background: var(--background); border-radius: 8px;">
-                    <div style="font-size: 32px; font-weight: bold; color: var(--primary-color);">${stats.total_attachments}</div>
-                    <div style="color: var(--text-muted); margin-top: 5px;">总附件数</div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.total_attachments}</div>
+                    <div class="stat-label">总附件数</div>
                 </div>
-                <div style="text-align: center; padding: 20px; background: var(--background); border-radius: 8px;">
-                    <div style="font-size: 32px; font-weight: bold; color: var(--primary-color);">${stats.week_memos}</div>
-                    <div style="color: var(--text-muted); margin-top: 5px;">本周新增</div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.week_memos}</div>
+                    <div class="stat-label">本周新增</div>
                 </div>
-                <div style="text-align: center; padding: 20px; background: var(--background); border-radius: 8px;">
-                    <div style="font-size: 32px; font-weight: bold; color: var(--primary-color);">${stats.month_memos}</div>
-                    <div style="color: var(--text-muted); margin-top: 5px;">本月新增</div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.month_memos}</div>
+                    <div class="stat-label">本月新增</div>
                 </div>
-                <div style="text-align: center; padding: 20px; background: var(--background); border-radius: 8px;">
-                    <div style="font-size: 32px; font-weight: bold; color: var(--primary-color);">${stats.year_memos}</div>
-                    <div style="color: var(--text-muted); margin-top: 5px;">本年新增</div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.year_memos}</div>
+                    <div class="stat-label">本年新增</div>
                 </div>
             `;
             html += '</div>';
