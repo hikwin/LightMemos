@@ -133,6 +133,8 @@ function initPublishVditor() {
         height: 'auto',
         mode: 'ir',
         placeholder: '写下你的想法... (Ctrl+Enter 发布)',
+        cdn: './assets/vendor/vditor', // 使用相对路径加载本地资源
+        lang: 'zh_CN', // 指定中文语言包
         hint: {
             emoji: getEmojiConfig()
         },
@@ -701,6 +703,8 @@ function showMobilePublishModal() {
                 height: 'auto',
                 mode: 'ir',
                 placeholder: '写下你的想法...',
+                cdn: './assets/vendor/vditor', // 使用相对路径加载本地资源
+                lang: 'zh_CN', // 指定中文语言包
                 hint: {
                     emoji: getEmojiConfig()
                 },
@@ -1759,6 +1763,8 @@ async function editInPlace(id) {
                     mode: 'ir', // 即时渲染模式
                     value: memo.content,
                     placeholder: '编辑笔记内容...',
+                    cdn: './assets/vendor/vditor', // 使用相对路径加载本地资源
+                    lang: 'zh_CN', // 指定中文语言包
                     hint: {
                         emoji: getEmojiConfig()
                     },

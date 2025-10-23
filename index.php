@@ -919,8 +919,11 @@ if (!defined('DB_PATH') || !file_exists(DB_PATH)) {
         </div>
     </div>
     
-    <!-- Vditor 富文本编辑器 -->
+    <!-- Vditor 样式文件 -->
     <link rel="stylesheet" href="assets/vendor/vditor/index.css">
+    <!-- Vditor 内容主题 -->
+    <link rel="stylesheet" href="assets/vendor/vditor/dist/css/content-theme/light.css">
+    
     <!-- 移动端底部浮动发布按钮 -->
     <button class="mobile-fab" onclick="showMobilePublishModal()" title="发布笔记">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -969,6 +972,10 @@ if (!defined('DB_PATH') || !file_exists(DB_PATH)) {
         </div>
     </div>
     
+    <!-- Vditor 国际化文件 -->
+    <script src="assets/vendor/vditor/dist/js/i18n/zh_CN.js"></script>
+    <!-- Vditor 图标文件 -->
+    <script src="assets/vendor/vditor/dist/js/icons/ant.js"></script>
     <!-- Vditor JS -->
     <script src="assets/vendor/vditor/index.min.js"></script>
     
