@@ -1,0 +1,36 @@
+# LightMemos Apache 配置
+# 兼容 Apache 2.2 和 2.4
+
+# 保护敏感文件（兼容 Apache 2.2 和 2.4）
+<FilesMatch "^(config\.php|\.htaccess|\.git.*|composer\.(json|lock))$">
+    <IfModule mod_authz_core.c>
+        # Apache 2.4
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        # Apache 2.2
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# 启用符号链接（某些配置需要）
+Options +FollowSymLinks
+
+# 禁止目录浏览
+Options -Indexes
+
+# 默认首页
+DirectoryIndex index.php index.html
+
+# PHP 设置（仅在 Apache 模块模式下有效，CGI模式请使用 .user.ini）
+<IfModule mod_php7.c>
+    php_value upload_max_filesize 10M
+    php_value post_max_size 10M
+    php_value max_execution_time 30
+    php_value memory_limit 128M
+</IfModule>
+
+# 错误页面
+ErrorDocument 404 /index.php
+ErrorDocument 403 /index.php

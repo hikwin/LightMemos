@@ -1,0 +1,24 @@
+# LightMemos 最小化 Apache 配置
+# 如果标准.htaccess导致500错误，请将此文件重命名为.htaccess
+
+# 保护配置文件（Apache 2.4语法）
+<FilesMatch "^(config\.php|\.htaccess)$">
+    Require all denied
+</FilesMatch>
+
+# 如果你的服务器是 Apache 2.2，请使用下面这个版本替换上面的配置：
+# <FilesMatch "^(config\.php|\.htaccess)$">
+#     Order allow,deny
+#     Deny from all
+# </FilesMatch>
+
+# 禁止目录浏览
+Options -Indexes
+
+# 默认首页
+DirectoryIndex index.php index.html
+
+# 注意：
+# 1. PHP设置请使用 .user.ini 文件（已包含在项目中）
+# 2. 如果Options指令也导致错误，请注释掉上面的 Options -Indexes
+
