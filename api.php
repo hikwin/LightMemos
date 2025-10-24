@@ -164,6 +164,10 @@ switch ($action) {
         handleV1AuthStatus($db, $method);
         break;
     
+    case 'update_tags':
+        handleUpdateTags($db, $method);
+        break;
+    
     default:
         response(['error' => '无效的操作'], 400);
 }
@@ -202,8 +206,10 @@ function handleMemos($db, $method) {
         }
         
         if ($search) {
-            $where[] = "content LIKE ?";
-            $params[] = "%{$search}%";
+            // 转义特殊字符，避免SQL注入和错误匹配
+            $escapedSearch = str_replace(['%', '_'], ['\%', '\_'], $search);
+            $where[] = "content LIKE ? ESCAPE '\\'";
+            $params[] = "%{$escapedSearch}%";
         }
         
         if ($date) {
@@ -266,6 +272,7 @@ function handleMemos($db, $method) {
         
         // 如果是links筛选，进一步过滤掉只有图片链接的笔记
         if ($filter === 'links') {
+            $originalCount = count($memos);
             $memos = array_filter($memos, function($memo) {
                 // 使用正则匹配超链接（不包括图片链接）
                 // 匹配 [text](url) 但不匹配 ![alt](url)
@@ -273,12 +280,13 @@ function handleMemos($db, $method) {
             });
             // 重新索引数组
             $memos = array_values($memos);
-            // 更新总数
-            $total = count($memos);
+            // 注意：不要修改 total，因为它代表的是数据库中符合条件的总记录数
+            // 过滤只影响当前页的显示结果
         }
         
         // 如果是todo筛选，进一步精确过滤
         if ($filter === 'todo') {
+            $originalCount = count($memos);
             $memos = array_filter($memos, function($memo) {
                 // 使用正则匹配待办事项
                 // 匹配 - [ ] 或 - [x] 或 * [ ] 等格式
@@ -287,8 +295,8 @@ function handleMemos($db, $method) {
             });
             // 重新索引数组
             $memos = array_values($memos);
-            // 更新总数
-            $total = count($memos);
+            // 注意：不要修改 total，因为它代表的是数据库中符合条件的总记录数
+            // 过滤只影响当前页的显示结果
         }
         
         // 获取每个笔记的标签和附件
@@ -510,8 +518,10 @@ function handleAttachments($db, $method) {
         $params = [];
         
         if ($search) {
-            $where[] = "a.original_name LIKE ?";
-            $params[] = "%{$search}%";
+            // 转义特殊字符
+            $escapedSearch = str_replace(['%', '_'], ['\%', '\_'], $search);
+            $where[] = "a.original_name LIKE ? ESCAPE '\\'";
+            $params[] = "%{$escapedSearch}%";
         }
         
         $whereClause = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
@@ -934,8 +944,10 @@ function handleShares($db, $method) {
         
         // 搜索内容
         if ($search) {
-            $where[] = "m.content LIKE ?";
-            $params[] = "%{$search}%";
+            // 转义特殊字符
+            $escapedSearch = str_replace(['%', '_'], ['\%', '\_'], $search);
+            $where[] = "m.content LIKE ? ESCAPE '\\'";
+            $params[] = "%{$escapedSearch}%";
         }
         
         // 筛选加密状态
@@ -2570,5 +2582,89 @@ function removeTagsFromContent($content) {
     }
     
     return implode("\n", $filteredLines);
+}
+
+// 处理更新标签
+function handleUpdateTags($db, $method) {
+    if ($method !== 'POST') {
+        response(['error' => '方法不允许'], 405);
+    }
+    
+    try {
+        // 获取参数
+        $memoId = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+        $tagsJson = isset($_POST['tags']) ? $_POST['tags'] : '[]';
+        
+        if (!$memoId) {
+            response(['error' => '笔记ID无效'], 400);
+        }
+        
+        // 解析标签
+        $tags = json_decode($tagsJson, true);
+        if (!is_array($tags)) {
+            $tags = [];
+        }
+        
+        // 验证笔记是否存在
+        $stmt = $db->prepare("SELECT id FROM memos WHERE id = ? AND archived = 0");
+        $stmt->execute([$memoId]);
+        $memo = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$memo) {
+            response(['error' => '笔记不存在'], 404);
+        }
+        
+        // 开始事务
+        $db->beginTransaction();
+        
+        try {
+            // 删除该笔记的所有现有标签关联
+            $stmt = $db->prepare("DELETE FROM memo_tags WHERE memo_id = ?");
+            $stmt->execute([$memoId]);
+            
+            // 添加新标签
+            foreach ($tags as $tagName) {
+                $tagName = trim($tagName);
+                if (empty($tagName)) {
+                    continue;
+                }
+                
+                // 查找或创建标签
+                $stmt = $db->prepare("SELECT id FROM tags WHERE name = ?");
+                $stmt->execute([$tagName]);
+                $tag = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$tag) {
+                    // 创建新标签
+                    $stmt = $db->prepare("INSERT INTO tags (name, created_at) VALUES (?, ?)");
+                    $stmt->execute([$tagName, date('Y-m-d H:i:s')]);
+                    $tagId = $db->lastInsertId();
+                } else {
+                    $tagId = $tag['id'];
+                }
+                
+                // 关联标签到笔记
+                $stmt = $db->prepare("INSERT INTO memo_tags (memo_id, tag_id) VALUES (?, ?)");
+                $stmt->execute([$memoId, $tagId]);
+            }
+            
+            // 更新笔记的修改时间
+            $stmt = $db->prepare("UPDATE memos SET updated_at = ? WHERE id = ?");
+            $stmt->execute([date('Y-m-d H:i:s'), $memoId]);
+            
+            // 提交事务
+            $db->commit();
+            
+            response(['success' => true, 'message' => '标签更新成功']);
+            
+        } catch (Exception $e) {
+            // 回滚事务
+            $db->rollBack();
+            throw $e;
+        }
+        
+    } catch (Exception $e) {
+        response(['error' => '更新标签失败: ' . $e->getMessage()], 500);
+    }
 }
 

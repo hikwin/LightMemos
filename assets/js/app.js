@@ -5,6 +5,7 @@ let currentTag = '';
 let currentDate = '';
 let selectedDate = ''; // 存储日历中选中的日期
 let currentFilter = ''; // 当前内容筛选器: 'pinned', 'links', 'todo', 'code'
+let currentSearch = ''; // 当前搜索词
 let isLoading = false;
 let hasMoreData = true;
 let currentCalendarYear = new Date().getFullYear();
@@ -507,6 +508,7 @@ function performSearch() {
     const searchInput = document.getElementById('searchInput');
     if (searchInput) {
         const searchTerm = searchInput.value.trim();
+        currentSearch = searchTerm; // 保存搜索词到全局变量
         currentPage = 1;
         hasMoreData = true;
         loadMemos(searchTerm, false);
@@ -652,6 +654,7 @@ function handleViewChange(view, updateUrl = true) {
     
     switch(view) {
         case 'timeline':
+            currentSearch = ''; // 清空搜索词
             loadMemos('', false);
             // 延迟重新应用高度限制，确保DOM完全渲染
             setTimeout(() => {
@@ -1530,6 +1533,13 @@ function createMemoCard(memo) {
                         </svg>
                     </button>
                     <div class="more-dropdown" id="more-dropdown-${memo.id}">
+                        <button class="more-item" onclick="openEditTagsModal(${memo.id})">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                                <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                            </svg>
+                            标签
+                        </button>
                         <button class="more-item" onclick="copyMemoContent(${memo.id})">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
@@ -1804,7 +1814,10 @@ async function pinMemo(id) {
         if (result.data) {
             currentPage = 1;
             hasMoreData = true;
-            loadMemos('', false);
+            const searchInput = document.getElementById('searchInput');
+            const searchTerm = searchInput ? searchInput.value.trim() : '';
+            currentSearch = searchTerm;
+            loadMemos(currentSearch, false);
         }
     } catch (error) {
         console.error('置顶失败:', error);
@@ -1827,7 +1840,10 @@ async function unpinMemo(id) {
         if (result.data) {
             currentPage = 1;
             hasMoreData = true;
-            loadMemos('', false);
+            const searchInput = document.getElementById('searchInput');
+            const searchTerm = searchInput ? searchInput.value.trim() : '';
+            currentSearch = searchTerm;
+            loadMemos(currentSearch, false);
         }
     } catch (error) {
         console.error('取消置顶失败:', error);
@@ -2143,6 +2159,7 @@ function filterByTag(tag) {
         currentTag = tag;
     }
     
+    currentSearch = ''; // 清空搜索词
     currentPage = 1;
     hasMoreData = true;
     loadMemos('', false);
@@ -2171,6 +2188,7 @@ function toggleFilter(filterType) {
     }
     
     // 重置页码并重新加载
+    currentSearch = ''; // 清空搜索词
     currentPage = 1;
     hasMoreData = true;
     loadMemos('', false);
@@ -2457,7 +2475,7 @@ function hideBottomLoader() {
 function loadMoreMemos() {
     if (isLoading || !hasMoreData) return;
     currentPage++;
-    loadMemos('', true); // append = true
+    loadMemos(currentSearch, true); // append = true，使用全局搜索词
 }
 
 // 初始化日历
@@ -6458,5 +6476,168 @@ function switchExample(type) {
     if (activeBtn) activeBtn.classList.add('active');
     if (activeContent) activeContent.classList.add('active');
 }
+
+// ==================== 标签编辑功能 ====================
+
+// 存储当前编辑的标签列表
+let editingTags = [];
+
+// 打开编辑标签模态框
+async function openEditTagsModal(memoId) {
+    try {
+        // 获取笔记数据
+        const response = await fetch(`api.php?action=memo&id=${memoId}`);
+        const result = await response.json();
+        
+        if (result.data) {
+            const memo = result.data;
+            
+            // 存储当前笔记ID
+            document.getElementById('editTagsMemoId').value = memoId;
+            
+            // 初始化标签列表
+            editingTags = memo.tags ? memo.tags.map(tag => tag.name) : [];
+            
+            // 渲染标签chips
+            renderEditTagChips();
+            
+            // 清空输入框
+            document.getElementById('editTagsInput').value = '';
+            
+            // 显示模态框
+            document.getElementById('editTagsModal').classList.add('active');
+            
+            // 关闭更多菜单
+            const dropdown = document.getElementById(`more-dropdown-${memoId}`);
+            if (dropdown) {
+                dropdown.classList.remove('show');
+            }
+            
+            // 聚焦到输入框
+            setTimeout(() => {
+                document.getElementById('editTagsInput').focus();
+            }, 100);
+        } else {
+            showToast('获取笔记信息失败', 'error');
+        }
+    } catch (error) {
+        console.error('打开标签编辑失败:', error);
+        showToast('打开标签编辑失败', 'error');
+    }
+}
+
+// 隐藏编辑标签模态框
+function hideEditTagsModal() {
+    document.getElementById('editTagsModal').classList.remove('active');
+    editingTags = [];
+}
+
+// 渲染标签chips
+function renderEditTagChips() {
+    const chipsContainer = document.getElementById('editTagChips');
+    chipsContainer.innerHTML = '';
+    
+    editingTags.forEach((tag, index) => {
+        const chip = document.createElement('span');
+        chip.className = 'tag-chip';
+        chip.innerHTML = `
+            ${escapeHtml(tag)}
+            <span class="tag-chip-remove" onclick="removeEditingTag(${index})">&times;</span>
+        `;
+        chipsContainer.appendChild(chip);
+    });
+}
+
+// 移除正在编辑的标签
+function removeEditingTag(index) {
+    editingTags.splice(index, 1);
+    renderEditTagChips();
+}
+
+// 添加标签到编辑列表
+function addEditingTag(tagName) {
+    const trimmedTag = tagName.trim();
+    
+    if (!trimmedTag) return;
+    
+    // 检查是否已存在
+    if (editingTags.includes(trimmedTag)) {
+        showToast('标签已存在', 'warning');
+        return;
+    }
+    
+    // 添加标签
+    editingTags.push(trimmedTag);
+    renderEditTagChips();
+    
+    // 清空输入框
+    document.getElementById('editTagsInput').value = '';
+}
+
+// 保存编辑的标签
+async function saveEditedTags() {
+    const memoId = document.getElementById('editTagsMemoId').value;
+    
+    if (!memoId) {
+        showToast('笔记ID无效', 'error');
+        return;
+    }
+    
+    try {
+        // 更新标签
+        const formData = new FormData();
+        formData.append('id', memoId);
+        formData.append('tags', JSON.stringify(editingTags));
+        
+        const response = await fetch('api.php?action=update_tags', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast('标签更新成功', 'success');
+            hideEditTagsModal();
+            
+            // 刷新当前页面内容
+            if (currentView === 'timeline') {
+                currentPage = 1;
+                loadMemos();
+            }
+            
+            // 重新加载标签列表
+            loadTags();
+        } else {
+            showToast(result.error || '标签更新失败', 'error');
+        }
+    } catch (error) {
+        console.error('保存标签失败:', error);
+        showToast('保存标签失败', 'error');
+    }
+}
+
+// 监听标签编辑输入框的回车事件
+document.addEventListener('DOMContentLoaded', function() {
+    const editTagsInput = document.getElementById('editTagsInput');
+    if (editTagsInput) {
+        editTagsInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addEditingTag(this.value);
+            }
+        });
+    }
+    
+    // 点击模态框外部关闭
+    const editTagsModal = document.getElementById('editTagsModal');
+    if (editTagsModal) {
+        editTagsModal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                hideEditTagsModal();
+            }
+        });
+    }
+});
 
 

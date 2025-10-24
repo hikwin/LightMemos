@@ -1108,6 +1108,31 @@ print(result)</code></pre>
         </div>
     </div>
     
+    <!-- 编辑标签模态框 -->
+    <div id="editTagsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>编辑标签</h2>
+                <button class="modal-close" onclick="hideEditTagsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="editTagsMemoId">
+                <div class="form-group">
+                    <label for="editTagsInput">标签</label>
+                    <div class="tag-input-container" id="editTagsContainer">
+                        <div class="tag-chips" id="editTagChips"></div>
+                        <input type="text" id="editTagsInput" placeholder="添加标签..." class="tag-input-field">
+                    </div>
+                    <p class="form-hint">按回车键添加标签，点击标签上的 × 可以删除</p>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="hideEditTagsModal()">取消</button>
+                    <button type="button" class="btn-primary" onclick="saveEditedTags()">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
     <!-- Vditor 样式文件 -->
     <link rel="stylesheet" href="assets/vendor/vditor/index.css">
     <!-- Vditor 内容主题 -->
