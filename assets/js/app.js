@@ -6373,16 +6373,36 @@ function hideApiAddressModal() {
 function updateApiEndpointUrl() {
     const endpointElement = document.getElementById('apiEndpointUrl');
     if (endpointElement) {
-        const baseUrl = window.location.origin;
+        // 获取当前页面的基础 URL（包含子目录）
+        const baseUrl = getBaseUrl();
         endpointElement.textContent = `POST ${baseUrl}/api.php?action=/api/v1/memos`;
     }
     
     // 更新 Web Clipper API URL
     const clipperApiElement = document.getElementById('clipperApiUrl');
     if (clipperApiElement) {
-        const baseUrl = window.location.origin;
+        // 获取当前页面的基础 URL（包含子目录）
+        const baseUrl = getBaseUrl();
         clipperApiElement.textContent = `${baseUrl}/api.php?action=`;
     }
+}
+
+// 获取基础 URL（支持子目录部署）
+function getBaseUrl() {
+    const currentUrl = window.location.href;
+    const pathname = window.location.pathname;
+    
+    // 如果当前页面是 index.php，则移除 index.php 获取基础路径
+    if (pathname.endsWith('/index.php') || pathname.endsWith('/')) {
+        return currentUrl.replace(/\/index\.php$/, '').replace(/\/$/, '');
+    }
+    
+    // 如果当前页面是其他页面，则获取目录路径
+    const pathParts = pathname.split('/');
+    pathParts.pop(); // 移除文件名
+    const basePath = pathParts.join('/');
+    
+    return window.location.origin + basePath;
 }
 
 // 复制 API 端点
