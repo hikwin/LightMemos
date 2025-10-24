@@ -168,6 +168,10 @@ switch ($action) {
         handleUpdateTags($db, $method);
         break;
     
+    case 'clean_unused_images':
+        handleCleanUnusedImages($db, $method);
+        break;
+    
     default:
         response(['error' => '无效的操作'], 400);
 }
@@ -2553,12 +2557,46 @@ function handleV1AuthStatus($db, $method) {
 function extractTagsFromContent($content) {
     $tags = [];
     
-    // 匹配 #标签 格式（插件会在内容末尾添加）
-    if (preg_match_all('/#([a-zA-Z0-9\u4e00-\u9fa5_-]+)/u', $content, $matches)) {
-        foreach ($matches[1] as $tag) {
-            $tag = trim($tag);
-            if (!empty($tag) && !in_array($tag, $tags)) {
-                $tags[] = $tag;
+    // 优化：从末尾倒序查找换行符，避免扫描整个内容
+    $contentLen = strlen($content);
+    if ($contentLen === 0) {
+        return $tags;
+    }
+    
+    // 从末尾向前查找第一个换行符
+    $lastNewlinePos = strrpos($content, "\n");
+    
+    if ($lastNewlinePos === false) {
+        // 如果没有换行符，整个内容就是一行，不提取标签
+        return $tags;
+    }
+    
+    // 获取最后一个换行符之后的内容（最后一行）
+    $lastLine = substr($content, $lastNewlinePos + 1);
+    
+    // 使用 trim 前先检查长度，避免不必要的操作
+    if (empty($lastLine)) {
+        return $tags;
+    }
+    
+    $lastLine = trim($lastLine);
+    
+    // 快速检查：如果不是以 # 开头，直接返回
+    if ($lastLine[0] !== '#') {
+        return $tags;
+    }
+    
+    // 检查最后一行是否只包含标签（格式：#标签1 #标签2）
+    // 使用 \p{L} 匹配任何语言的字母（包括中文）
+    // \p{N} 匹配任何数字
+    if (preg_match('/^(#[\p{L}\p{N}_-]+\s*)+$/u', $lastLine)) {
+        // 提取所有标签
+        if (preg_match_all('/#([\p{L}\p{N}_-]+)/u', $lastLine, $matches)) {
+            foreach ($matches[1] as $tag) {
+                $tag = trim($tag);
+                if (!empty($tag) && !in_array($tag, $tags)) {
+                    $tags[] = $tag;
+                }
             }
         }
     }
@@ -2568,20 +2606,46 @@ function extractTagsFromContent($content) {
 
 // 从内容中移除标签（避免重复显示）
 function removeTagsFromContent($content) {
-    // 移除末尾的标签行（插件添加的格式）
-    $lines = explode("\n", $content);
-    $filteredLines = [];
-    
-    foreach ($lines as $line) {
-        $line = trim($line);
-        // 如果整行都是标签（以#开头且不包含其他内容），则跳过
-        if (preg_match('/^#([a-zA-Z0-9\u4e00-\u9fa5_-]+\s*)+$/', $line)) {
-            continue;
-        }
-        $filteredLines[] = $line;
+    // 优化：从末尾倒序查找换行符
+    $contentLen = strlen($content);
+    if ($contentLen === 0) {
+        return $content;
     }
     
-    return implode("\n", $filteredLines);
+    // 从末尾向前查找第一个换行符
+    $lastNewlinePos = strrpos($content, "\n");
+    
+    if ($lastNewlinePos === false) {
+        // 如果没有换行符，整个内容就是一行，不移除任何内容
+        return $content;
+    }
+    
+    // 获取最后一个换行符之后的内容（最后一行）
+    $lastLine = substr($content, $lastNewlinePos + 1);
+    
+    // 快速检查：如果最后一行为空或不以 # 开头，直接返回
+    if (empty($lastLine)) {
+        return $content;
+    }
+    
+    $lastLine = trim($lastLine);
+    
+    // 如果最后一行为空（只有空白）或不以 # 开头，直接返回
+    if (empty($lastLine) || $lastLine[0] !== '#') {
+        return $content;
+    }
+    
+    // 检查最后一行是否只包含标签（格式：#标签1 #标签2）
+    // 使用 \p{L} 匹配任何语言的字母（包括中文）
+    // \p{N} 匹配任何数字
+    if (preg_match('/^(#[\p{L}\p{N}_-]+\s*)+$/u', $lastLine)) {
+        // 移除最后一行（包括前面的换行符）
+        $content = substr($content, 0, $lastNewlinePos);
+        // 移除末尾多余的空白
+        $content = rtrim($content);
+    }
+    
+    return $content;
 }
 
 // 处理更新标签
@@ -2665,6 +2729,73 @@ function handleUpdateTags($db, $method) {
         
     } catch (Exception $e) {
         response(['error' => '更新标签失败: ' . $e->getMessage()], 500);
+    }
+}
+
+// 清理未引用的图片
+function handleCleanUnusedImages($db, $method) {
+    if ($method !== 'POST') {
+        response(['error' => '方法不允许'], 405);
+    }
+    
+    try {
+        // 图片格式列表
+        $imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'ico'];
+        
+        // 获取所有图片附件
+        $stmt = $db->prepare("SELECT * FROM attachments ORDER BY id");
+        $stmt->execute();
+        $attachments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $deletedCount = 0;
+        $freedSpace = 0;
+        $deletedFiles = [];
+        
+        foreach ($attachments as $attachment) {
+            // 检查是否是图片格式
+            $ext = strtolower(pathinfo($attachment['filename'], PATHINFO_EXTENSION));
+            
+            if (!in_array($ext, $imageExtensions)) {
+                // 不是图片格式，跳过
+                continue;
+            }
+            
+            // 检查是否被任何笔记引用
+            $stmt = $db->prepare("SELECT COUNT(*) FROM memos WHERE content LIKE ? AND archived = 0");
+            $stmt->execute(['%' . $attachment['filename'] . '%']);
+            $refCount = (int)$stmt->fetchColumn();
+            
+            if ($refCount === 0) {
+                // 未被引用，删除附件
+                
+                // 删除物理文件
+                $filePath = $attachment['file_path'];
+                if (file_exists($filePath)) {
+                    $fileSize = filesize($filePath);
+                    if (unlink($filePath)) {
+                        $freedSpace += $fileSize;
+                    }
+                }
+                
+                // 从数据库删除记录
+                $deleteStmt = $db->prepare("DELETE FROM attachments WHERE id = ?");
+                $deleteStmt->execute([$attachment['id']]);
+                
+                $deletedCount++;
+                $deletedFiles[] = $attachment['original_name'];
+            }
+        }
+        
+        response([
+            'success' => true,
+            'deleted_count' => $deletedCount,
+            'freed_space' => $freedSpace,
+            'deleted_files' => $deletedFiles,
+            'message' => "成功清理 {$deletedCount} 个未引用的图片"
+        ]);
+        
+    } catch (Exception $e) {
+        response(['error' => '清理失败: ' . $e->getMessage()], 500);
     }
 }
 

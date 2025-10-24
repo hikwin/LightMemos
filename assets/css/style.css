@@ -4472,6 +4472,62 @@ body {
         justify-content: center;
     }
     
+    /* 手机端附件网格布局：3列 */
+    .attachment-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-top: 15px;
+    }
+    
+    .attachment-item-image,
+    .attachment-item-file {
+        padding: 10px;
+        border-radius: 8px;
+    }
+    
+    .attachment-thumbnail {
+        height: 100px;
+        margin-bottom: 8px;
+        border-radius: 6px;
+    }
+    
+    .attachment-name {
+        font-size: 12px;
+        line-height: 1.3;
+        max-height: 2.6em;
+    }
+    
+    .attachment-icon {
+        height: 80px;
+        margin-bottom: 8px;
+    }
+    
+    .attachment-icon svg {
+        width: 36px;
+        height: 36px;
+    }
+    
+    .attachment-delete-btn {
+        width: 26px;
+        height: 26px;
+        top: 6px;
+        right: 6px;
+        /* 手机端默认显示删除按钮，不需要 hover */
+        opacity: 1;
+        transform: scale(1);
+        background: rgba(239, 68, 68, 0.85);
+    }
+    
+    .attachment-delete-btn svg {
+        width: 14px;
+        height: 14px;
+    }
+    
+    .attachment-delete-btn:active {
+        background: rgba(220, 38, 38, 1);
+        transform: scale(0.95);
+    }
+    
     .attachment-list-item {
         padding: 8px 10px;
         gap: 10px;

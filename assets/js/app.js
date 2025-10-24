@@ -2794,6 +2794,14 @@ function getAttachmentSearchHtml(searchTerm = '', fileType = 'all') {
                     </svg>
                 </button>
             </div>
+            <button class="view-toggle-btn" onclick="cleanUnusedImages()" title="清理未引用的图片" style="margin-left: 8px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                    <line x1="14" y1="11" x2="14" y2="17"></line>
+                </svg>
+            </button>
         </div>
     `;
 }
@@ -6639,5 +6647,58 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// ==================== 清理未引用图片功能 ====================
+
+// 清理未引用的图片
+async function cleanUnusedImages() {
+    try {
+        // 第一步：询问用户是否确认清理
+        if (!confirm('是否清理未被任何文章引用的图片？\n\n此操作将删除所有未被引用的图片附件，其他格式的附件不会被删除。')) {
+            return;
+        }
+        
+        // 第二步：要求用户输入 yes 确认
+        const confirmation = prompt('请输入 "yes" 确认清理未引用的图片：');
+        
+        if (confirmation !== 'yes') {
+            showToast('已取消清理操作', 'info');
+            return;
+        }
+        
+        // 显示处理中提示
+        showToast('正在检查和清理未引用的图片...', 'info', 0);
+        
+        // 调用API清理
+        const response = await fetch('api.php?action=clean_unused_images', {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        // 关闭处理中提示
+        const toastContainer = document.querySelector('.toast-container');
+        if (toastContainer) {
+            toastContainer.innerHTML = '';
+        }
+        
+        if (result.success) {
+            const message = `清理完成！\n删除了 ${result.deleted_count} 个未引用的图片\n释放空间约 ${formatFileSize(result.freed_space)}`;
+            showToast(message.replace(/\n/g, '<br>'), 'success', 6000);
+            
+            // 重新加载附件列表
+            const searchInput = document.getElementById('attachmentSearchInput');
+            const typeFilter = document.getElementById('attachmentTypeFilter');
+            const searchTerm = searchInput ? searchInput.value.trim() : '';
+            const fileType = typeFilter ? typeFilter.value : 'all';
+            loadAttachments(searchTerm, fileType, 1);
+        } else {
+            showToast(result.error || '清理失败', 'error');
+        }
+    } catch (error) {
+        console.error('清理失败:', error);
+        showToast('清理失败：' + error.message, 'error');
+    }
+}
 
 
