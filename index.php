@@ -794,8 +794,9 @@ if (!defined('DB_PATH') || !file_exists(DB_PATH)) {
                 <button class="modal-close" onclick="hideApiTokensModal()">&times;</button>
             </div>
             <div class="modal-body">
-                <div style="margin-bottom: 20px;">
+                <div style="margin-bottom: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
                     <button class="btn-primary" onclick="showCreateApiTokenModal()">创建新 Token</button>
+                    <button class="btn-secondary" onclick="showApiAddressModal()">查看 API 地址</button>
                 </div>
                 <div id="apiTokensList" style="min-height: 200px;">
                     <div class="loading"><div class="spinner"></div></div>
@@ -819,19 +820,207 @@ if (!defined('DB_PATH') || !file_exists(DB_PATH)) {
                     </div>
                     <div class="form-group">
                         <label for="tokenExpires">过期时间</label>
-                        <select id="tokenExpires" name="tokenExpires">
-                            <option value="0">永不过期</option>
-                            <option value="7">7天</option>
-                            <option value="30">30天</option>
-                            <option value="90">90天</option>
-                            <option value="365">1年</option>
-                        </select>
+                        <div class="select-wrapper">
+                            <select id="tokenExpires" name="tokenExpires" class="enhanced-select">
+                                <option value="0">永不过期</option>
+                                <option value="1">1天</option>
+                                <option value="7">7天</option>
+                                <option value="30">30天</option>
+                                <option value="90">90天</option>
+                                <option value="365">1年</option>
+                            </select>
+                            <div class="select-arrow">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6 9 12 15 18 9"></polyline>
+                                </svg>
+                            </div>
+                        </div>
                     </div>
                     <div class="form-actions">
                         <button type="button" class="btn-secondary" onclick="hideCreateApiTokenModal()">取消</button>
                         <button type="submit" class="btn-primary">创建</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- API 地址弹窗 -->
+    <div id="apiAddressModal" class="modal">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h2>API 接口地址</h2>
+                <button class="modal-close" onclick="hideApiAddressModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="api-info-section">
+                    <h3>📝 创建笔记接口</h3>
+                    <div class="api-endpoint">
+                        <label>接口地址：</label>
+                        <div class="endpoint-url">
+                            <code id="apiEndpointUrl">POST /api.php?action=/api/v1/memos</code>
+                            <button class="btn-copy" onclick="copyApiEndpoint()">复制</button>
+                        </div>
+                    </div>
+                    
+                    <div class="api-auth">
+                        <label>认证方式：</label>
+                        <code>Authorization: Bearer YOUR_TOKEN</code>
+                    </div>
+                </div>
+                
+                <div class="api-request-section">
+                    <h3>📋 请求示例</h3>
+                    <div class="request-examples">
+                        <div class="example-tab">
+                            <button class="tab-btn active" onclick="switchExample('curl')">cURL</button>
+                            <button class="tab-btn" onclick="switchExample('javascript')">JavaScript</button>
+                            <button class="tab-btn" onclick="switchExample('python')">Python</button>
+                        </div>
+                        
+                        <div id="curlExample" class="example-content active">
+                            <pre><code id="curlCode">curl -X POST "https://your-domain.com/api.php?action=/api/v1/memos" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{
+    "content": "# 我的笔记\n\n这是通过 API 创建的笔记",
+    "visibility": "PRIVATE",
+    "tags": ["api", "test"]
+  }'</code></pre>
+                        </div>
+                        
+                        <div id="javascriptExample" class="example-content">
+                            <pre><code id="javascriptCode">const response = await fetch('/api.php?action=/api/v1/memos', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer YOUR_TOKEN'
+  },
+  body: JSON.stringify({
+    content: '# 我的笔记\n\n这是通过 API 创建的笔记',
+    visibility: 'PRIVATE',
+    tags: ['api', 'test']
+  })
+});
+
+const result = await response.json();
+console.log(result);</code></pre>
+                        </div>
+                        
+                        <div id="pythonExample" class="example-content">
+                            <pre><code id="pythonCode">import requests
+
+url = "https://your-domain.com/api.php?action=/api/v1/memos"
+headers = {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer YOUR_TOKEN"
+}
+data = {
+    "content": "# 我的笔记\n\n这是通过 API 创建的笔记",
+    "visibility": "PRIVATE",
+    "tags": ["api", "test"]
+}
+
+response = requests.post(url, headers=headers, json=data)
+result = response.json()
+print(result)</code></pre>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="api-params-section">
+                    <h3>📖 参数说明</h3>
+                    <div class="params-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>参数</th>
+                                    <th>类型</th>
+                                    <th>必填</th>
+                                    <th>说明</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>content</code></td>
+                                    <td>string</td>
+                                    <td>是</td>
+                                    <td>笔记内容，支持 Markdown</td>
+                                </tr>
+                                <tr>
+                                    <td><code>visibility</code></td>
+                                    <td>string</td>
+                                    <td>否</td>
+                                    <td>可见性：PRIVATE（默认）、PUBLIC</td>
+                                </tr>
+                                <tr>
+                                    <td><code>tags</code></td>
+                                    <td>array</td>
+                                    <td>否</td>
+                                    <td>标签数组，如 ["tag1", "tag2"]</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="api-clipper-section">
+                    <h3>🌐 推荐浏览器插件</h3>
+                    <div class="clipper-info">
+                        <div class="clipper-header">
+                            <div class="clipper-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14,2 14,8 20,8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                    <polyline points="10,9 9,9 8,9"></polyline>
+                                </svg>
+                            </div>
+                            <div class="clipper-title">
+                                <h4>Microsoft Edge Web Clipper</h4>
+                                <p>一键剪藏任何网页到笔记中</p>
+                            </div>
+                        </div>
+                        
+                        <div class="clipper-steps">
+                            <h5>📥 安装配置步骤：</h5>
+                            <ol>
+                                <li>
+                                    <strong>安装插件</strong>：
+                                    <a href="https://microsoftedge.microsoft.com/addons/detail/web-clipper/opejamnnohhbjflpbhnmdlknhjkfhfdp" 
+                                       target="_blank" class="clipper-link">
+                                        Microsoft Edge Web Clipper
+                                    </a>
+                                </li>
+                                <li>
+                                    <strong>添加账户</strong>：在 Web Clipper 中选择账户类型为 <code>Memos</code>
+                                </li>
+                                <li>
+                                    <strong>配置接口</strong>：接口地址填写 <code id="clipperApiUrl">你的地址/api.php?action=</code>
+                                    <button class="btn-copy-small" onclick="copyClipperApiUrl()">复制</button>
+                                </li>
+                                <li>
+                                    <strong>填写 Token</strong>：输入你的 Access Token 并确认
+                                </li>
+                            </ol>
+                        </div>
+                        
+                        <div class="clipper-features">
+                            <h5>✨ 功能特点：</h5>
+                            <ul>
+                                <li>📄 支持剪藏完整网页内容</li>
+                                <li>🎯 智能提取文章标题和正文</li>
+                                <li>🏷️ 自动添加标签</li>
+                                <li>⚡ 一键保存到 LightMemos</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-actions">
+                    <button class="btn-secondary" onclick="hideApiAddressModal()">关闭</button>
+                </div>
             </div>
         </div>
     </div>

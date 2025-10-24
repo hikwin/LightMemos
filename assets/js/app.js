@@ -148,6 +148,26 @@ document.addEventListener('DOMContentLoaded', function() {
             handleViewChange(view, false); // 不更新URL，避免循环
         }
     });
+    
+    // 监听页面加载时的哈希处理
+    window.addEventListener('load', function() {
+        // 如果当前在根地址且没有哈希，确保显示时间线
+        if (window.location.hash === '' && currentView !== 'timeline') {
+            currentView = 'timeline';
+            updateNavigationState('timeline');
+            handleViewChange('timeline', false);
+        }
+        
+        // 页面完全加载后，重新应用高度限制（解决刷新时失效的问题）
+        setTimeout(() => {
+            if (currentView === 'timeline') {
+                const memoCards = document.querySelectorAll('.memo-card');
+                memoCards.forEach(card => {
+                    applyMemoHeightLimit(card);
+                });
+            }
+        }, 500);
+    });
 });
 
 // 初始化发布区 Vditor
@@ -633,6 +653,13 @@ function handleViewChange(view, updateUrl = true) {
     switch(view) {
         case 'timeline':
             loadMemos('', false);
+            // 延迟重新应用高度限制，确保DOM完全渲染
+            setTimeout(() => {
+                const memoCards = document.querySelectorAll('.memo-card');
+                memoCards.forEach(card => {
+                    applyMemoHeightLimit(card);
+                });
+            }, 300);
             break;
         case 'attachments':
             loadAttachments();
@@ -651,15 +678,22 @@ function handleViewChange(view, updateUrl = true) {
 
 // 更新 URL 哈希
 function updateUrlHash(view) {
+    // 时间线页面不使用哈希，直接使用根地址
+    if (view === 'timeline') {
+        if (window.location.hash !== '') {
+            window.history.pushState(null, '', window.location.pathname);
+        }
+        return;
+    }
+    
     const hashMap = {
-        'timeline': '#timeline',
         'attachments': '#attachments', 
         'stats': '#stats',
         'shares': '#shares',
         'settings': '#settings'
     };
     
-    const hash = hashMap[view] || '#timeline';
+    const hash = hashMap[view] || '';
     if (window.location.hash !== hash) {
         window.history.pushState(null, '', hash);
     }
@@ -668,8 +702,13 @@ function updateUrlHash(view) {
 // 从 URL 哈希获取视图
 function getViewFromHash() {
     const hash = window.location.hash;
+    
+    // 如果没有哈希，默认显示时间线
+    if (hash === '') {
+        return 'timeline';
+    }
+    
     const hashToView = {
-        '#timeline': 'timeline',
         '#attachments': 'attachments',
         '#stats': 'stats', 
         '#shares': 'shares',
@@ -1319,6 +1358,27 @@ function applyMemoHeightLimit(card) {
     const memoContent = card.querySelector('.memo-content');
     if (!memoContent) return;
     
+    // 检查是否已经存在展开按钮，避免重复渲染
+    const existingExpandBtn = card.querySelector('.memo-expand-btn');
+    if (existingExpandBtn) {
+        // 如果已存在按钮，重新计算高度并更新状态
+        const actualHeight = memoContent.scrollHeight;
+        if (actualHeight > maxHeight) {
+            card.classList.add('memo-collapsed');
+            memoContent.style.maxHeight = maxHeight + 'px';
+            memoContent.style.overflow = 'hidden';
+            memoContent.style.position = 'relative';
+        } else {
+            // 如果内容不再需要折叠，移除按钮和相关样式
+            card.classList.remove('memo-collapsed', 'memo-expanded');
+            memoContent.style.maxHeight = '';
+            memoContent.style.overflow = '';
+            memoContent.style.position = '';
+            existingExpandBtn.remove();
+        }
+        return;
+    }
+    
     const actualHeight = memoContent.scrollHeight;
     
     // 如果内容高度超过限制
@@ -1528,8 +1588,10 @@ function createMemoCard(memo) {
         // 为待办事项的复选框添加点击事件
         enableTodoCheckboxes(card, memo);
         
-        // 检测并应用高度限制
-        applyMemoHeightLimit(card);
+        // 检测并应用高度限制（延迟执行确保DOM完全渲染）
+        setTimeout(() => {
+            applyMemoHeightLimit(card);
+        }, 100);
     }, 0);
     
     return card;
@@ -6287,6 +6349,94 @@ async function deleteApiToken(tokenId, tokenName) {
         console.error('删除 Token 失败:', error);
         showToast('删除失败', 'error');
     }
+}
+
+// 显示 API 地址弹窗
+function showApiAddressModal() {
+    const modal = document.getElementById('apiAddressModal');
+    if (modal) {
+        modal.classList.add('show');
+        // 更新 API 地址为当前域名
+        updateApiEndpointUrl();
+    }
+}
+
+// 隐藏 API 地址弹窗
+function hideApiAddressModal() {
+    const modal = document.getElementById('apiAddressModal');
+    if (modal) {
+        modal.classList.remove('show');
+    }
+}
+
+// 更新 API 端点 URL
+function updateApiEndpointUrl() {
+    const endpointElement = document.getElementById('apiEndpointUrl');
+    if (endpointElement) {
+        const baseUrl = window.location.origin;
+        endpointElement.textContent = `POST ${baseUrl}/api.php?action=/api/v1/memos`;
+    }
+    
+    // 更新 Web Clipper API URL
+    const clipperApiElement = document.getElementById('clipperApiUrl');
+    if (clipperApiElement) {
+        const baseUrl = window.location.origin;
+        clipperApiElement.textContent = `${baseUrl}/api.php?action=`;
+    }
+}
+
+// 复制 API 端点
+function copyApiEndpoint() {
+    const endpointElement = document.getElementById('apiEndpointUrl');
+    if (endpointElement) {
+        const text = endpointElement.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            showToast('API 地址已复制到剪贴板', 'success');
+        }).catch(() => {
+            // 降级处理
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            showToast('API 地址已复制到剪贴板', 'success');
+        });
+    }
+}
+
+// 复制 Web Clipper API URL
+function copyClipperApiUrl() {
+    const clipperApiElement = document.getElementById('clipperApiUrl');
+    if (clipperApiElement) {
+        const text = clipperApiElement.textContent;
+        navigator.clipboard.writeText(text).then(() => {
+            showToast('Web Clipper API 地址已复制到剪贴板', 'success');
+        }).catch(() => {
+            // 降级处理
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            showToast('Web Clipper API 地址已复制到剪贴板', 'success');
+        });
+    }
+}
+
+// 切换示例代码
+function switchExample(type) {
+    // 移除所有活动状态
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelectorAll('.example-content').forEach(content => content.classList.remove('active'));
+    
+    // 激活选中的标签和内容
+    const activeBtn = document.querySelector(`[onclick="switchExample('${type}')"]`);
+    const activeContent = document.getElementById(`${type}Example`);
+    
+    if (activeBtn) activeBtn.classList.add('active');
+    if (activeContent) activeContent.classList.add('active');
 }
 
 

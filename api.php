@@ -1,6 +1,22 @@
 <?php
 // API 接口
 session_start();
+
+// 检查是否需要重定向到主页
+if (isset($_GET['action']) && preg_match('/^\/u\/[a-zA-Z0-9_]+$/', $_GET['action'])) {
+    // 检测到 /api.php?action=/u/xxxx 格式，重定向到主页
+    $protocol = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'];
+    $scriptDir = dirname($_SERVER['SCRIPT_NAME']);
+    
+    // 构建主页 URL
+    $baseUrl = $protocol . '://' . $host . $scriptDir;
+    $baseUrl = rtrim($baseUrl, '/');
+    
+    header("Location: $baseUrl");
+    exit;
+}
+
 header('Content-Type: application/json; charset=utf-8');
 
 require_once 'config.php';
@@ -8,7 +24,7 @@ require_once 'includes/functions.php';
 
 // 检查是否已登录（除了登录相关的API和v1 API）
 $action = isset($_GET['action']) ? $_GET['action'] : '';
-$isV1Api = in_array($action, ['v1/memos', '/api/v1/memos']);
+$isV1Api = in_array($action, ['v1/memos', '/api/v1/memos', 'v1/auth/status', '/api/v1/auth/status']);
 if (!$isV1Api && !in_array($action, ['login', 'logout']) && !isset($_SESSION['user_id'])) {
     response(['error' => '未登录', 'code' => 'UNAUTHORIZED'], 401);
 }
@@ -141,6 +157,11 @@ switch ($action) {
     case 'v1/memos':
     case '/api/v1/memos':
         handleV1Memos($db, $method);
+        break;
+    
+    case 'v1/auth/status':
+    case '/api/v1/auth/status':
+        handleV1AuthStatus($db, $method);
         break;
     
     default:
@@ -2253,9 +2274,22 @@ function handleV1Memos($db, $method) {
             ], 400);
         }
         
-        $content = isset($input['content']) ? trim($input['content']) : '';
-        $visibility = isset($input['visibility']) ? $input['visibility'] : 'VISIBILITY_UNSPECIFIED';
-        $tags = isset($input['tags']) && is_array($input['tags']) ? $input['tags'] : [];
+        // 支持插件格式：{ data: { content, visibility } }
+        $data = isset($input['data']) ? $input['data'] : $input;
+        
+        $content = isset($data['content']) ? trim($data['content']) : '';
+        $visibility = isset($data['visibility']) ? $data['visibility'] : 'PRIVATE';
+        $tags = isset($data['tags']) && is_array($data['tags']) ? $data['tags'] : [];
+        
+        // 如果插件没有发送 tags 字段，尝试从内容中提取标签
+        if (empty($tags)) {
+            $extractedTags = extractTagsFromContent($content);
+            if (!empty($extractedTags)) {
+                $tags = $extractedTags;
+                // 从内容中移除标签，避免重复显示
+                $content = removeTagsFromContent($content);
+            }
+        }
         
         // 验证必填字段
         if (empty($content)) {
@@ -2332,21 +2366,17 @@ function handleV1Memos($db, $method) {
             $stmt->execute([$memoId]);
             $memoTags = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // 格式化响应（模仿 memos API）
+            // 获取用户信息用于返回
+            $stmt = $db->prepare("SELECT username FROM users WHERE id = ?");
+            $stmt->execute([$userId]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+            $creator = $user ? $user['username'] : 'LightMemos User';
+            
+            // 格式化响应（符合插件期望的格式）
             $response = [
-                'code' => 0,
-                'message' => 'OK',
-                'memo' => [
-                    'id' => (int)$memo['id'],
-                    'row_status' => $memo['archived'] ? 'ARCHIVED' : 'NORMAL',
-                    'creator_id' => $userId,
-                    'content' => $memo['content'],
-                    'visibility' => $visibility,
-                    'resource_ids' => [],
-                    'tags' => array_column($memoTags, 'name'),
-                    'create_time' => date('c', strtotime($memo['created_at'])),
-                    'update_time' => date('c', strtotime($memo['updated_at']))
-                ]
+                'id' => (string)$memo['id'],
+                'content' => $memo['content'],
+                'creator' => $creator
             ];
             
             response($response, 200);
@@ -2420,5 +2450,125 @@ function handleV1Memos($db, $method) {
             'message' => '不支持的请求方法'
         ], 405);
     }
+}
+
+// 处理 v1/auth/status 接口
+function handleV1AuthStatus($db, $method) {
+    if ($method !== 'POST') {
+        response([
+            'code' => 12,
+            'message' => '不支持的请求方法'
+        ], 405);
+    }
+    
+    // 验证 API token
+    $tokenData = validateApiToken($db);
+    $userId = $tokenData['user_id'];
+    
+    try {
+        // 获取用户信息（兼容没有新字段的旧数据库）
+        $stmt = $db->prepare("SELECT username, email FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$user) {
+            response([
+                'code' => 5,
+                'message' => '用户不存在'
+            ], 404);
+        }
+        
+        // 尝试获取新字段（如果不存在则动态添加）
+        $avatarUrl = '';
+        $description = '';
+        
+        try {
+            $stmt = $db->prepare("SELECT avatar_url, description FROM users WHERE id = ?");
+            $stmt->execute([$userId]);
+            $extraFields = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($extraFields) {
+                $avatarUrl = $extraFields['avatar_url'] ?: '';
+                $description = $extraFields['description'] ?: '';
+            }
+        } catch (Exception $e) {
+            // 字段不存在，尝试添加字段
+            try {
+                $db->exec("ALTER TABLE users ADD COLUMN avatar_url TEXT");
+            } catch (Exception $e2) {
+                // 字段可能已存在，忽略错误
+            }
+            try {
+                $db->exec("ALTER TABLE users ADD COLUMN description TEXT");
+            } catch (Exception $e2) {
+                // 字段可能已存在，忽略错误
+            }
+            
+            // 重新尝试查询
+            try {
+                $stmt = $db->prepare("SELECT avatar_url, description FROM users WHERE id = ?");
+                $stmt->execute([$userId]);
+                $extraFields = $stmt->fetch(PDO::FETCH_ASSOC);
+                if ($extraFields) {
+                    $avatarUrl = $extraFields['avatar_url'] ?: '';
+                    $description = $extraFields['description'] ?: '';
+                }
+            } catch (Exception $e3) {
+                // 仍然失败，使用默认值
+                $avatarUrl = '';
+                $description = '';
+            }
+        }
+        
+        // 返回用户信息，格式符合插件期望
+        response([
+            'code' => 0,
+            'message' => 'OK',
+            'username' => $user['username'] ?: 'LightMemos User',
+            'avatarUrl' => $avatarUrl,
+            'description' => $description ?: 'LightMemos User',
+            'email' => $user['email'] ?: ''
+        ], 200);
+        
+    } catch (Exception $e) {
+        response([
+            'code' => 13,
+            'message' => '内部错误: ' . $e->getMessage()
+        ], 500);
+    }
+}
+
+// 从内容中提取标签（支持插件格式）
+function extractTagsFromContent($content) {
+    $tags = [];
+    
+    // 匹配 #标签 格式（插件会在内容末尾添加）
+    if (preg_match_all('/#([a-zA-Z0-9\u4e00-\u9fa5_-]+)/u', $content, $matches)) {
+        foreach ($matches[1] as $tag) {
+            $tag = trim($tag);
+            if (!empty($tag) && !in_array($tag, $tags)) {
+                $tags[] = $tag;
+            }
+        }
+    }
+    
+    return $tags;
+}
+
+// 从内容中移除标签（避免重复显示）
+function removeTagsFromContent($content) {
+    // 移除末尾的标签行（插件添加的格式）
+    $lines = explode("\n", $content);
+    $filteredLines = [];
+    
+    foreach ($lines as $line) {
+        $line = trim($line);
+        // 如果整行都是标签（以#开头且不包含其他内容），则跳过
+        if (preg_match('/^#([a-zA-Z0-9\u4e00-\u9fa5_-]+\s*)+$/', $line)) {
+            continue;
+        }
+        $filteredLines[] = $line;
+    }
+    
+    return implode("\n", $filteredLines);
 }
 

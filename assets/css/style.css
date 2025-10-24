@@ -13,6 +13,523 @@
     margin-bottom: 30px;
 }
 
+/* 增强的下拉框样式 */
+.select-wrapper {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+}
+
+.enhanced-select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: 100%;
+    padding: 12px 40px 12px 16px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--background);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    outline: none;
+}
+
+.enhanced-select:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.1);
+}
+
+.enhanced-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.2);
+}
+
+.enhanced-select option {
+    padding: 8px 12px;
+    background: var(--background);
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.select-arrow {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: var(--text-secondary);
+    transition: all 0.3s ease;
+}
+
+.select-wrapper:hover .select-arrow {
+    color: var(--primary-color);
+}
+
+.select-wrapper:focus-within .select-arrow {
+    color: var(--primary-color);
+    transform: translateY(-50%) rotate(180deg);
+}
+
+/* 暗色主题适配 */
+[data-theme="dark"] .enhanced-select {
+    background: var(--background);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .enhanced-select:hover {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.1);
+}
+
+[data-theme="dark"] .enhanced-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(24, 144, 255, 0.2);
+}
+
+[data-theme="dark"] .enhanced-select option {
+    background: var(--background);
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .select-arrow {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .select-wrapper:hover .select-arrow {
+    color: var(--primary-color);
+}
+
+[data-theme="dark"] .select-wrapper:focus-within .select-arrow {
+    color: var(--primary-color);
+}
+
+/* API 地址弹窗样式 */
+#apiAddressModal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+#apiAddressModal.show {
+    display: flex;
+}
+
+.api-info-section,
+.api-request-section,
+.api-params-section,
+.api-clipper-section {
+    margin-bottom: 30px;
+    padding: 20px;
+    background: var(--background);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.api-info-section h3,
+.api-request-section h3,
+.api-params-section h3,
+.api-clipper-section h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: var(--text-primary);
+    font-size: 16px;
+    font-weight: 600;
+}
+
+/* Web Clipper 区域样式 */
+.clipper-info {
+    margin-top: 15px;
+}
+
+.clipper-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: var(--sidebar-bg);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.clipper-icon {
+    width: 48px;
+    height: 48px;
+    background: var(--primary-color);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    flex-shrink: 0;
+}
+
+.clipper-icon svg {
+    width: 24px;
+    height: 24px;
+}
+
+.clipper-title h4 {
+    margin: 0 0 5px 0;
+    color: var(--text-primary);
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.clipper-title p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
+.clipper-steps {
+    margin-bottom: 20px;
+}
+
+.clipper-steps h5 {
+    margin: 0 0 15px 0;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.clipper-steps ol {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.clipper-steps li {
+    margin-bottom: 12px;
+    line-height: 1.6;
+    color: var(--text-primary);
+}
+
+.clipper-steps code {
+    background: var(--sidebar-bg);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--primary-color);
+}
+
+.clipper-link {
+    color: var(--primary-color);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.clipper-link:hover {
+    color: #40a9ff;
+    text-decoration: underline;
+}
+
+.btn-copy-small {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    cursor: pointer;
+    margin-left: 8px;
+    transition: all 0.2s ease;
+}
+
+.btn-copy-small:hover {
+    background: #40a9ff;
+}
+
+.clipper-features {
+    margin-top: 20px;
+}
+
+.clipper-features h5 {
+    margin: 0 0 15px 0;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.clipper-features ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+.clipper-features li {
+    margin-bottom: 8px;
+    line-height: 1.5;
+    color: var(--text-primary);
+}
+
+.api-endpoint,
+.api-auth {
+    margin-bottom: 15px;
+}
+
+.api-endpoint label,
+.api-auth label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.endpoint-url {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: var(--sidebar-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 14px;
+}
+
+.endpoint-url code {
+    flex: 1;
+    color: var(--text-primary);
+    background: none;
+    padding: 0;
+    font-size: 14px;
+}
+
+.btn-copy {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-copy:hover {
+    background: #40a9ff;
+}
+
+.api-auth code {
+    background: var(--sidebar-bg);
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+/* 请求示例样式 */
+.request-examples {
+    margin-top: 15px;
+}
+
+.example-tab {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-secondary);
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.tab-btn:hover {
+    color: var(--text-primary);
+}
+
+.tab-btn.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+}
+
+.example-content {
+    display: none;
+}
+
+.example-content.active {
+    display: block;
+}
+
+.example-content pre {
+    background: var(--sidebar-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 15px;
+    margin: 0;
+    overflow-x: auto;
+}
+
+.example-content code {
+    background: none;
+    color: var(--text-primary);
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+/* 参数表格样式 */
+.params-table {
+    overflow-x: auto;
+}
+
+.params-table table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.params-table th,
+.params-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.params-table th {
+    background: var(--sidebar-bg);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.params-table td {
+    color: var(--text-primary);
+}
+
+.params-table td code {
+    background: var(--sidebar-bg);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--primary-color);
+}
+
+/* 暗色主题适配 */
+[data-theme="dark"] #apiAddressModal {
+    background: rgba(0, 0, 0, 0.7);
+}
+
+[data-theme="dark"] .api-info-section,
+[data-theme="dark"] .api-request-section,
+[data-theme="dark"] .api-params-section,
+[data-theme="dark"] .api-clipper-section {
+    background: var(--background);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .clipper-header {
+    background: var(--sidebar-bg);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .clipper-steps code {
+    background: var(--sidebar-bg);
+    color: var(--primary-color);
+}
+
+[data-theme="dark"] .endpoint-url {
+    background: var(--sidebar-bg);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .example-content pre {
+    background: var(--sidebar-bg);
+    border-color: var(--border-color);
+}
+
+[data-theme="dark"] .params-table th {
+    background: var(--sidebar-bg);
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+    #apiAddressModal .modal-content {
+        width: 95%;
+        max-width: 95%;
+        margin: 10px;
+        max-height: 95vh;
+    }
+    
+    .api-info-section,
+    .api-request-section,
+    .api-params-section,
+    .api-clipper-section {
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .clipper-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 10px;
+    }
+    
+    .clipper-icon {
+        width: 40px;
+        height: 40px;
+    }
+    
+    .clipper-icon svg {
+        width: 20px;
+        height: 20px;
+    }
+    
+    .clipper-steps li {
+        margin-bottom: 10px;
+        font-size: 14px;
+    }
+    
+    .btn-copy-small {
+        padding: 3px 6px;
+        font-size: 10px;
+    }
+    
+    .endpoint-url {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+    
+    .example-tab {
+        flex-wrap: wrap;
+    }
+    
+    .tab-btn {
+        padding: 6px 12px;
+        font-size: 13px;
+    }
+    
+    .params-table {
+        font-size: 13px;
+    }
+    
+    .params-table th,
+    .params-table td {
+        padding: 8px 10px;
+    }
+}
+
 .stat-card {
     text-align: center;
     padding: 20px;
@@ -2048,6 +2565,16 @@ body {
         font-size: 12px;
         margin-top: 6px;
         font-weight: 500;
+    }
+    
+    /* 手机端下拉框样式优化 */
+    .enhanced-select {
+        padding: 10px 36px 10px 12px;
+        font-size: 16px; /* 防止iOS缩放 */
+    }
+    
+    .select-arrow {
+        right: 10px;
     }
     
     /* 显示移动端顶部导航栏 */
