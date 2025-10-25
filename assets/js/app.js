@@ -178,6 +178,13 @@ function initPublishVditor() {
         return;
     }
     
+    // 检查元素是否存在（公开模式下可能不存在）
+    const publishElement = document.getElementById('vditorPublish');
+    if (!publishElement) {
+        console.warn('发布编辑器元素不存在，可能处于公开模式');
+        return;
+    }
+    
     publishVditor = new Vditor('vditorPublish', {
         minHeight: 150,
         height: 'auto',
@@ -818,6 +825,13 @@ function showMobilePublishModal() {
         
         // 初始化移动端编辑器（如果还没有初始化）
         if (!mobileVditor && typeof Vditor !== 'undefined') {
+            // 检查移动端编辑器元素是否存在
+            const mobileElement = document.getElementById('vditorMobile');
+            if (!mobileElement) {
+                console.warn('移动端编辑器元素不存在');
+                return;
+            }
+            
             mobileVditor = new Vditor('vditorMobile', {
                 minHeight: 300,
                 height: 'auto',
@@ -1448,6 +1462,9 @@ function createMemoCard(memo) {
     card.className = 'memo-card' + (memo.pinned == 1 ? ' pinned' : '');
     card.dataset.id = memo.id;
     
+    // 检查是否为游客模式（通过检查是否存在发布编辑器元素）
+    const isGuestMode = !document.getElementById('vditorPublish');
+    
     // 解析 Markdown
     let contentHtml;
     if (typeof marked !== 'undefined') {
@@ -1495,79 +1512,115 @@ function createMemoCard(memo) {
         attachmentsHtml += '</div>';
     }
     
-    card.innerHTML = `
-        <div class="memo-header">
-            <span class="memo-time">${formatTime(memo.created_at)}</span>
-            <div class="memo-actions">
-                ${memo.pinned == 1 
-                    ? `<button class="memo-action-btn" onclick="unpinMemo(${memo.id})" title="取消置顶">
-                        <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
-                            <line x1="12" y1="17" x2="12" y2="22"></line>
-                            <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
-                        </svg>
-                       </button>`
-                    : `<button class="memo-action-btn" onclick="pinMemo(${memo.id})" title="置顶">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="12" y1="17" x2="12" y2="22"></line>
-                            <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
-                        </svg>
-                       </button>`
-                }
-                <button class="memo-action-btn" onclick="editInPlace(${memo.id})" title="编辑">
+    // 根据是否为游客模式生成不同的HTML
+    const actionsHtml = isGuestMode ? '' : `
+        <div class="memo-actions">
+            ${memo.pinned == 1 
+                ? `<button class="memo-action-btn" onclick="unpinMemo(${memo.id})" title="取消置顶">
+                    <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="17" x2="12" y2="22"></line>
+                        <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
+                    </svg>
+                   </button>`
+                : `<button class="memo-action-btn" onclick="pinMemo(${memo.id})" title="置顶">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                        <line x1="12" y1="17" x2="12" y2="22"></line>
+                        <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
+                    </svg>
+                   </button>`
+            }
+            <button class="memo-action-btn" onclick="editInPlace(${memo.id})" title="编辑">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path>
+                </svg>
+            </button>
+            <button class="memo-action-btn" onclick="deleteMemo(${memo.id})" title="删除">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+            </button>
+            <div class="memo-more-menu">
+                <button class="memo-action-btn memo-more-btn" onclick="toggleMoreMenu(${memo.id})" title="更多">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="1"></circle>
+                        <circle cx="19" cy="12" r="1"></circle>
+                        <circle cx="5" cy="12" r="1"></circle>
                     </svg>
                 </button>
-                <button class="memo-action-btn" onclick="deleteMemo(${memo.id})" title="删除">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="3 6 5 6 21 6"></polyline>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                </button>
-                <div class="memo-more-menu">
-                    <button class="memo-action-btn memo-more-btn" onclick="toggleMoreMenu(${memo.id})" title="更多">
+                <div class="more-dropdown" id="more-dropdown-${memo.id}">
+                    <button class="more-item" onclick="openEditTagsModal(${memo.id})">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="1"></circle>
-                            <circle cx="19" cy="12" r="1"></circle>
-                            <circle cx="5" cy="12" r="1"></circle>
+                            <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                            <line x1="7" y1="7" x2="7.01" y2="7"></line>
                         </svg>
+                        标签
                     </button>
-                    <div class="more-dropdown" id="more-dropdown-${memo.id}">
-                        <button class="more-item" onclick="openEditTagsModal(${memo.id})">
+                    <button class="more-item" onclick="copyMemoContent(${memo.id})">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                        复制
+                    </button>
+                    <button class="more-item" onclick="exportMemoAsMarkdown(${memo.id})">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7,10 12,15 17,10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        导出
+                    </button>
+                    <button class="more-item" onclick="shareMemo(${memo.id})">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="18" cy="5" r="3"></circle>
+                            <circle cx="6" cy="12" r="3"></circle>
+                            <circle cx="18" cy="19" r="3"></circle>
+                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                        </svg>
+                        分享
+                    </button>
+                    ${(memo.visibility || 'private') === 'public' 
+                        ? `<button class="more-item" onclick="confirmSetMemoVisibility(${memo.id}, 'private')">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
-                                <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                <circle cx="12" cy="16" r="1"></circle>
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                             </svg>
-                            标签
-                        </button>
-                        <button class="more-item" onclick="copyMemoContent(${memo.id})">
+                            设为私有
+                        </button>`
+                        : `<button class="more-item" onclick="confirmSetMemoVisibility(${memo.id}, 'public')">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
                             </svg>
-                            复制
-                        </button>
-                        <button class="more-item" onclick="exportMemoAsMarkdown(${memo.id})">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                <polyline points="7,10 12,15 17,10"></polyline>
-                                <line x1="12" y1="15" x2="12" y2="3"></line>
-                            </svg>
-                            导出
-                        </button>
-                        <button class="more-item" onclick="shareMemo(${memo.id})">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="18" cy="5" r="3"></circle>
-                                <circle cx="6" cy="12" r="3"></circle>
-                                <circle cx="18" cy="19" r="3"></circle>
-                                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-                            </svg>
-                            分享
-                        </button>
-                    </div>
+                            设为公开
+                        </button>`
+                    }
                 </div>
             </div>
+        </div>
+    `;
+
+    // 生成公开标识HTML（只在非游客模式下显示）
+    const visibilityBadgeHtml = !isGuestMode && (memo.visibility === 'public') ? `
+        <span class="visibility-badge public">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            公开
+        </span>
+    ` : '';
+
+    card.innerHTML = `
+        <div class="memo-header">
+            <div class="memo-header-left">
+                <span class="memo-time">${formatTime(memo.created_at)}</span>
+                ${visibilityBadgeHtml}
+            </div>
+            ${actionsHtml}
         </div>
         ${tagsHtml}
         <div class="memo-content">${contentHtml}</div>
@@ -1866,7 +1919,7 @@ async function editMemo(id) {
             currentTags = memo.tags.map(t => t.name);
             renderTags();
             
-            // 滚动到编辑器
+            // 滚动到编辑器（如果存在）
             const editorEl = document.getElementById('vditorPublish');
             if (editorEl) {
                 editorEl.scrollIntoView({ behavior: 'smooth' });
@@ -4903,6 +4956,21 @@ async function loadSiteSettings() {
             // 更新页面标题
             document.title = siteName + ' - 笔记管理系统';
         }
+        
+        // 加载网站权限设置
+        const visibilityResponse = await fetch('api.php?action=site_visibility');
+        const visibilityResult = await visibilityResponse.json();
+        
+        if (visibilityResult.visibility) {
+            const privateRadio = document.getElementById('siteVisibilityPrivate');
+            const publicRadio = document.getElementById('siteVisibilityPublic');
+            
+            if (visibilityResult.visibility === 'public') {
+                if (publicRadio) publicRadio.checked = true;
+            } else {
+                if (privateRadio) privateRadio.checked = true;
+            }
+        }
     } catch (error) {
         console.error('加载网站设置失败:', error);
     }
@@ -4959,6 +5027,7 @@ async function saveSiteSettings() {
     const formData = new FormData(form);
     
     const siteName = formData.get('siteName');
+    const siteVisibility = formData.get('siteVisibility');
     
     if (!siteName.trim()) {
         showToast('网站名称不能为空', 'warning');
@@ -4966,6 +5035,7 @@ async function saveSiteSettings() {
     }
     
     try {
+        // 保存网站名称
         const response = await fetch('api.php?action=site_settings', {
             method: 'POST',
             headers: {
@@ -4979,10 +5049,27 @@ async function saveSiteSettings() {
         const result = await response.json();
         
         if (result.success) {
-            showToast('设置保存成功', 'success');
-            hideSiteSettingsModal();
-            // 更新页面标题
-            document.title = siteName + ' - 笔记管理系统';
+            // 保存网站权限设置
+            const visibilityResponse = await fetch('api.php?action=site_visibility', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    visibility: siteVisibility
+                })
+            });
+            
+            const visibilityResult = await visibilityResponse.json();
+            
+            if (visibilityResult.success) {
+                showToast('设置保存成功', 'success');
+                hideSiteSettingsModal();
+                // 更新页面标题
+                document.title = siteName + ' - 笔记管理系统';
+            } else {
+                showToast('权限设置保存失败：' + (visibilityResult.error || '未知错误'), 'error');
+            }
         } else {
             showToast('设置保存失败：' + (result.error || '未知错误'), 'error');
         }
@@ -6698,6 +6785,51 @@ async function cleanUnusedImages() {
     } catch (error) {
         console.error('清理失败:', error);
         showToast('清理失败：' + error.message, 'error');
+    }
+}
+
+// ==================== 权限设置功能 ====================
+
+// 确认设置文章权限
+function confirmSetMemoVisibility(memoId, visibility) {
+    const action = visibility === 'public' ? '设为公开' : '设为私有';
+    const warning = visibility === 'public' 
+        ? '设为公开后，所有访客都可以查看此文章。' 
+        : '设为私有后，只有登录用户可以查看此文章。';
+    const message = `${warning}\n\n确定要${action}吗？`;
+    
+    if (confirm(message)) {
+        setMemoVisibility(memoId, visibility);
+    }
+}
+
+// 设置文章权限
+async function setMemoVisibility(memoId, visibility) {
+    try {
+        const response = await fetch('api.php?action=memo_visibility', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                id: memoId,
+                visibility: visibility
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast(`文章权限已设置为${visibility === 'public' ? '公开' : '私有'}`, 'success');
+            
+            // 重新加载文章列表以更新UI
+            loadMemos();
+        } else {
+            showToast('设置权限失败：' + (result.error || '未知错误'), 'error');
+        }
+    } catch (error) {
+        console.error('设置权限失败:', error);
+        showToast('设置权限失败：' + error.message, 'error');
     }
 }
 

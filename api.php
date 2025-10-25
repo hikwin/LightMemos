@@ -22,11 +22,34 @@ header('Content-Type: application/json; charset=utf-8');
 require_once 'config.php';
 require_once 'includes/functions.php';
 
-// 检查是否已登录（除了登录相关的API和v1 API）
+// 检查是否已登录
 $action = isset($_GET['action']) ? $_GET['action'] : '';
-$isV1Api = in_array($action, ['v1/memos', '/api/v1/memos', 'v1/auth/status', '/api/v1/auth/status']);
-if (!$isV1Api && !in_array($action, ['login', 'logout']) && !isset($_SESSION['user_id'])) {
+
+// 定义允许游客访问的只读API
+$guestAllowedActions = [
+    'memos',           // 获取文章列表（只读）
+    'memo',            // 获取单个文章（只读）
+    'tags',            // 获取标签列表（只读）
+    'stats',           // 获取统计信息（只读）
+    'login',           // 登录
+    'logout',          // 登出
+    'site_visibility'  // 获取网站权限设置（只读）
+];
+
+// 检查是否为游客访问
+$isGuest = !isset($_SESSION['user_id']);
+
+// 如果是游客访问且操作不在允许列表中，拒绝访问
+if ($isGuest && !in_array($action, $guestAllowedActions)) {
     response(['error' => '未登录', 'code' => 'UNAUTHORIZED'], 401);
+}
+
+// 对于游客访问的API，进一步限制HTTP方法
+if ($isGuest && in_array($action, $guestAllowedActions)) {
+    // 只允许GET请求，拒绝POST、PUT、DELETE等修改操作
+    if ($_SERVER['REQUEST_METHOD'] !== 'GET' && !in_array($action, ['login', 'logout'])) {
+        response(['error' => '未登录', 'code' => 'UNAUTHORIZED'], 401);
+    }
 }
 
 // 获取请求方法和操作
@@ -36,6 +59,19 @@ $action = isset($_GET['action']) ? $_GET['action'] : '';
 // 连接数据库
 try {
     $db = getDB();
+    
+    // 数据库升级：添加网站权限设置
+    try {
+        $stmt = $db->prepare("SELECT value FROM settings WHERE key = 'site_visibility'");
+        $stmt->execute();
+        $result = $stmt->fetch();
+        if (!$result) {
+            $db->prepare("INSERT INTO settings (key, value) VALUES (?, ?)")->execute(['site_visibility', 'private']);
+        }
+    } catch (Exception $e) {
+        // 忽略错误，可能表不存在
+    }
+    
 } catch (Exception $e) {
     response(['error' => '数据库连接失败'], 500);
 }
@@ -134,6 +170,14 @@ switch ($action) {
         handleChangeUsername($db, $method);
         break;
     
+    case 'site_visibility':
+        handleSiteVisibility($db, $method);
+        break;
+    
+    case 'memo_visibility':
+        handleMemoVisibility($db, $method);
+        break;
+    
     case 'upload_backup':
         handleUploadBackup($db, $method);
         break;
@@ -203,6 +247,11 @@ function handleMemos($db, $method) {
         
         $where = ['archived = 0'];
         $params = [];
+        
+        // 检查是否为公开模式，如果是游客访问，只显示公开权限的文章
+        if (!isset($_SESSION['user_id'])) {
+            $where[] = "visibility = 'public'";
+        }
         
         if ($tag) {
             $where[] = "id IN (SELECT memo_id FROM memo_tags mt JOIN tags t ON mt.tag_id = t.id WHERE t.name = ?)";
@@ -689,8 +738,14 @@ function handleUpload($db, $method) {
 // 处理统计信息
 function handleStats($db, $method) {
     if ($method === 'GET') {
+        // 检查是否为游客访问
+        $isGuest = !isset($_SESSION['user_id']);
+        
+        // 根据用户类型添加权限过滤条件
+        $visibilityCondition = $isGuest ? "AND visibility = 'public'" : "";
+        
         // 总笔记数
-        $totalMemos = $db->query("SELECT COUNT(*) FROM memos WHERE archived = 0")->fetchColumn();
+        $totalMemos = $db->query("SELECT COUNT(*) FROM memos WHERE archived = 0 {$visibilityCondition}")->fetchColumn();
         
         // 总标签数
         $totalTags = $db->query("SELECT COUNT(*) FROM tags")->fetchColumn();
@@ -702,6 +757,7 @@ function handleStats($db, $method) {
         $weekMemos = $db->query("
             SELECT COUNT(*) FROM memos 
             WHERE archived = 0 
+            {$visibilityCondition}
             AND DATE(created_at) >= DATE('now', '-7 days')
         ")->fetchColumn();
         
@@ -709,6 +765,7 @@ function handleStats($db, $method) {
         $monthMemos = $db->query("
             SELECT COUNT(*) FROM memos 
             WHERE archived = 0 
+            {$visibilityCondition}
             AND DATE(created_at) >= DATE('now', 'start of month')
         ")->fetchColumn();
         
@@ -716,6 +773,7 @@ function handleStats($db, $method) {
         $yearMemos = $db->query("
             SELECT COUNT(*) FROM memos 
             WHERE archived = 0 
+            {$visibilityCondition}
             AND DATE(created_at) >= DATE('now', 'start of year')
         ")->fetchColumn();
         
@@ -724,6 +782,7 @@ function handleStats($db, $method) {
             SELECT DATE(created_at) as date, COUNT(*) as count 
             FROM memos 
             WHERE archived = 0 
+            {$visibilityCondition}
             AND DATE(created_at) >= DATE('now', '-6 months')
             GROUP BY DATE(created_at)
             ORDER BY date ASC
@@ -744,6 +803,7 @@ function handleStats($db, $method) {
             SELECT DATE(created_at) as first_date 
             FROM memos 
             WHERE archived = 0 
+            {$visibilityCondition}
             ORDER BY created_at ASC 
             LIMIT 1
         ")->fetchColumn();
@@ -760,6 +820,7 @@ function handleStats($db, $method) {
             SELECT COUNT(DISTINCT DATE(created_at)) 
             FROM memos 
             WHERE archived = 0
+            {$visibilityCondition}
         ")->fetchColumn();
         
         // 连续记录天数（从昨天往前推，连续有记录的天数）
@@ -771,6 +832,7 @@ function handleStats($db, $method) {
             SELECT DISTINCT DATE(created_at) as date 
             FROM memos 
             WHERE archived = 0 
+            {$visibilityCondition}
             ORDER BY date DESC
         ")->fetchAll(PDO::FETCH_COLUMN);
         
@@ -2796,6 +2858,78 @@ function handleCleanUnusedImages($db, $method) {
         
     } catch (Exception $e) {
         response(['error' => '清理失败: ' . $e->getMessage()], 500);
+    }
+}
+
+// 处理网站权限设置
+function handleSiteVisibility($db, $method) {
+    if ($method === 'GET') {
+        try {
+            $stmt = $db->prepare("SELECT value FROM settings WHERE key = 'site_visibility'");
+            $stmt->execute();
+            $result = $stmt->fetch();
+            $visibility = $result ? $result['value'] : 'private';
+            
+            response(['visibility' => $visibility]);
+        } catch (Exception $e) {
+            response(['error' => '获取网站权限设置失败: ' . $e->getMessage()], 500);
+        }
+    } elseif ($method === 'POST') {
+        try {
+            $input = json_decode(file_get_contents('php://input'), true);
+            $visibility = isset($input['visibility']) ? $input['visibility'] : '';
+            
+            if (!in_array($visibility, ['private', 'public'])) {
+                response(['error' => '无效的权限设置'], 400);
+            }
+            
+            $stmt = $db->prepare("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)");
+            $stmt->execute(['site_visibility', $visibility]);
+            
+            response(['success' => true, 'message' => '网站权限设置已更新']);
+        } catch (Exception $e) {
+            response(['error' => '更新网站权限设置失败: ' . $e->getMessage()], 500);
+        }
+    } else {
+        response(['error' => '方法不允许'], 405);
+    }
+}
+
+// 处理文章权限设置
+function handleMemoVisibility($db, $method) {
+    if ($method === 'POST') {
+        try {
+            $input = json_decode(file_get_contents('php://input'), true);
+            $memoId = isset($input['id']) ? (int)$input['id'] : 0;
+            $visibility = isset($input['visibility']) ? $input['visibility'] : '';
+            
+            if (!$memoId) {
+                response(['error' => '笔记ID无效'], 400);
+            }
+            
+            if (!in_array($visibility, ['private', 'public'])) {
+                response(['error' => '无效的权限设置'], 400);
+            }
+            
+            // 验证笔记是否存在
+            $stmt = $db->prepare("SELECT id FROM memos WHERE id = ? AND archived = 0");
+            $stmt->execute([$memoId]);
+            $memo = $stmt->fetch();
+            
+            if (!$memo) {
+                response(['error' => '笔记不存在'], 404);
+            }
+            
+            // 更新权限
+            $stmt = $db->prepare("UPDATE memos SET visibility = ? WHERE id = ?");
+            $stmt->execute([$visibility, $memoId]);
+            
+            response(['success' => true, 'message' => '文章权限已更新']);
+        } catch (Exception $e) {
+            response(['error' => '更新文章权限失败: ' . $e->getMessage()], 500);
+        }
+    } else {
+        response(['error' => '方法不允许'], 405);
     }
 }
 

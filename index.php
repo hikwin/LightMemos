@@ -155,8 +155,20 @@ if (file_exists($configFile)) {
     exit;
 }
 
-// 检查是否已登录
-if (!isset($_SESSION['user_id'])) {
+// 检查网站权限设置
+$isPublicMode = false;
+try {
+    $db = getDB();
+    $stmt = $db->prepare("SELECT value FROM settings WHERE key = 'site_visibility'");
+    $stmt->execute();
+    $result = $stmt->fetch();
+    $isPublicMode = $result && $result['value'] === 'public';
+} catch (Exception $e) {
+    // 如果获取失败，默认为私有模式
+}
+
+// 检查是否已登录（公开模式下允许游客访问）
+if (!isset($_SESSION['user_id']) && !$isPublicMode) {
     header('Location: login.php');
     exit;
 }
@@ -281,6 +293,7 @@ if (!defined('DB_PATH') || !file_exists(DB_PATH)) {
                     </svg>
                     <span>时间线</span>
                 </a>
+                <?php if (isset($_SESSION['user_id'])): ?>
                 <a href="#" class="nav-item" data-view="attachments">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M13.234 20.252 21 12.3"></path>
@@ -307,9 +320,11 @@ if (!defined('DB_PATH') || !file_exists(DB_PATH)) {
                     </svg>
                     <span>分享管理</span>
                 </a>
+                <?php endif; ?>
             </nav>
             
             <div class="sidebar-footer">
+                <?php if (isset($_SESSION['user_id'])): ?>
                 <button class="settings-btn sidebar-action-btn" onclick="showSettings()" title="设置">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="3"></circle>
@@ -323,6 +338,14 @@ if (!defined('DB_PATH') || !file_exists(DB_PATH)) {
                         <line x1="21" y1="12" x2="9" y2="12"></line>
                     </svg>
                 </button>
+                <?php else: ?>
+                <button class="login-btn sidebar-action-btn" onclick="window.location.href='login.php'" title="登录">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                </button>
+                <?php endif; ?>
             </div>
         </aside>
         
@@ -409,6 +432,7 @@ if (!defined('DB_PATH') || !file_exists(DB_PATH)) {
             <!-- 笔记列表 -->
             <div class="content-area">
                 <!-- 新建笔记编辑器 -->
+                <?php if (isset($_SESSION['user_id'])): ?>
                 <div class="memo-editor">
                     <div id="vditorPublish"></div>
                     <div class="editor-toolbar">
@@ -471,6 +495,7 @@ if (!defined('DB_PATH') || !file_exists(DB_PATH)) {
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
                 
                 <!-- 笔记列表 -->
                 <div id="memoList" class="memo-list"></div>
@@ -543,6 +568,21 @@ if (!defined('DB_PATH') || !file_exists(DB_PATH)) {
                     <div class="form-group">
                         <label for="siteName">网站名称</label>
                         <input type="text" id="siteName" name="siteName" required>
+                    </div>
+                    <div class="form-group">
+                        <label>网站权限</label>
+                        <div class="radio-group">
+                            <label class="radio-label">
+                                <input type="radio" name="siteVisibility" id="siteVisibilityPrivate" value="private" checked>
+                                <span>🔒 私有模式</span>
+                                <small>用户需要登录才能访问，这是默认设置</small>
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="siteVisibility" id="siteVisibilityPublic" value="public">
+                                <span>🌐 公开模式</span>
+                                <small>游客可以浏览公开权限的文章</small>
+                            </label>
+                        </div>
                     </div>
                     <div class="form-actions">
                         <button type="button" class="btn-secondary" onclick="hideSiteSettingsModal()">取消</button>
@@ -1139,14 +1179,17 @@ print(result)</code></pre>
     <link rel="stylesheet" href="assets/vendor/vditor/dist/css/content-theme/light.css">
     
     <!-- 移动端底部浮动发布按钮 -->
+    <?php if (isset($_SESSION['user_id'])): ?>
     <button class="mobile-fab" onclick="showMobilePublishModal()" title="发布笔记">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="12" y1="5" x2="12" y2="19"></line>
             <line x1="5" y1="12" x2="19" y2="12"></line>
         </svg>
     </button>
+    <?php endif; ?>
     
     <!-- 移动端发布弹窗 -->
+    <?php if (isset($_SESSION['user_id'])): ?>
     <div id="mobilePublishModal" class="mobile-publish-modal">
         <div class="mobile-publish-content">
             <div class="mobile-publish-header">
@@ -1185,6 +1228,7 @@ print(result)</code></pre>
             </div>
         </div>
     </div>
+    <?php endif; ?>
     
     <!-- Vditor 国际化文件 -->
     <script src="assets/vendor/vditor/dist/js/i18n/zh_CN.js"></script>

@@ -142,6 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['install'])) {
         // 插入默认设置
         $db->prepare("INSERT INTO settings (key, value) VALUES (?, ?)")->execute(['site_name', $siteName]);
         $db->prepare("INSERT INTO settings (key, value) VALUES (?, ?)")->execute(['version', '1.0.0']);
+        $db->prepare("INSERT INTO settings (key, value) VALUES (?, ?)")->execute(['site_visibility', 'private']);
         
         // 为现有数据库添加新字段（兼容性更新）
         try {
