@@ -81,7 +81,7 @@ function closeToast(closeBtn) {
 }
 
 // 初始化应用
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     // 确保marked和Prism都已加载
     if (typeof marked !== 'undefined' && typeof Prism !== 'undefined') {
         initMarked();
@@ -89,6 +89,9 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         console.warn('Marked或Prism.js未正确加载');
     }
+    
+    // 优先加载用户偏好设置（确保文章高度限制等设置能正确应用）
+    await loadUserPreferences();
     
     // 初始化发布区 Vditor
     initPublishVditor();
@@ -1370,6 +1373,7 @@ async function enableTodoCheckboxes(card, memo) {
 // 应用文章高度限制
 function applyMemoHeightLimit(card) {
     const maxHeight = getMaxMemoHeight();
+    console.log('应用文章高度限制，最大高度:', maxHeight);
     if (maxHeight <= 0) return; // 0表示不限制
     
     const memoContent = card.querySelector('.memo-content');
@@ -5753,13 +5757,18 @@ async function loadUserPreferences() {
         const response = await fetch('api.php?action=user_preferences');
         const result = await response.json();
         
+        console.log('用户偏好设置API响应:', result);
+        
         if (result.success) {
             userPreferences.items_per_page = result.data.items_per_page;
             userPreferences.max_memo_height = result.data.max_memo_height;
             userPreferences.loaded = true;
+            console.log('用户偏好设置已加载:', userPreferences);
+        } else {
+            console.error('加载用户偏好设置失败:', result.error);
         }
     } catch (error) {
-        console.error('加载用户偏好设置失败:', error);
+        console.error('加载用户偏好设置异常:', error);
     }
     
     return userPreferences;

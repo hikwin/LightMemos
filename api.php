@@ -33,7 +33,8 @@ $guestAllowedActions = [
     'stats',           // 获取统计信息（只读）
     'login',           // 登录
     'logout',          // 登出
-    'site_visibility'  // 获取网站权限设置（只读）
+    'site_visibility', // 获取网站权限设置（只读）
+    'user_preferences' // 获取用户偏好设置（只读）
 ];
 
 // 检查是否为游客访问
@@ -1474,12 +1475,28 @@ function handleUserPreferences($db, $method) {
     
     if ($method === 'GET') {
         try {
-            $userId = $_SESSION['user_id'];
+            // 检查是否为游客访问
+            $isGuest = !isset($_SESSION['user_id']);
             
-            // 获取用户的偏好设置
-            $stmt = $db->prepare("SELECT key, value FROM settings WHERE key IN ('items_per_page', 'max_memo_height') AND (user_id = ? OR user_id IS NULL)");
-            $stmt->execute([$userId]);
-            $settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+            if ($isGuest) {
+                // 游客访问时，只返回全局设置（user_id IS NULL）
+                $stmt = $db->prepare("SELECT key, value FROM settings WHERE key IN ('items_per_page', 'max_memo_height') AND user_id IS NULL");
+                $stmt->execute();
+                $settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+                
+                // 如果数据库中没有全局设置，尝试获取任意设置（兼容旧版本数据库）
+                if (empty($settings)) {
+                    $stmt = $db->prepare("SELECT key, value FROM settings WHERE key IN ('items_per_page', 'max_memo_height') LIMIT 2");
+                    $stmt->execute();
+                    $settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+                }
+            } else {
+                // 登录用户访问时，获取用户的偏好设置（优先用户设置，其次全局设置）
+                $userId = $_SESSION['user_id'];
+                $stmt = $db->prepare("SELECT key, value FROM settings WHERE key IN ('items_per_page', 'max_memo_height') AND (user_id = ? OR user_id IS NULL)");
+                $stmt->execute([$userId]);
+                $settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+            }
             
             response([
                 'success' => true,
