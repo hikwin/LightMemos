@@ -37,11 +37,20 @@ $guestAllowedActions = [
     'user_preferences' // 获取用户偏好设置（只读）
 ];
 
+// 定义使用 Token 认证的 API（这些接口不需要 Session 登录，使用 Token 验证）
+$tokenAuthActions = [
+    'v1/memos',
+    '/api/v1/memos',
+    'v1/auth/status',
+    '/api/v1/auth/status'
+];
+
 // 检查是否为游客访问
 $isGuest = !isset($_SESSION['user_id']);
 
 // 如果是游客访问且操作不在允许列表中，拒绝访问
-if ($isGuest && !in_array($action, $guestAllowedActions)) {
+// 但是对于使用 Token 认证的 API，跳过此检查（由各自的处理函数内部验证 Token）
+if ($isGuest && !in_array($action, $guestAllowedActions) && !in_array($action, $tokenAuthActions)) {
     response(['error' => '未登录', 'code' => 'UNAUTHORIZED'], 401);
 }
 
