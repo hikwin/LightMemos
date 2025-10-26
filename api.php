@@ -1480,20 +1480,20 @@ function handleUserPreferences($db, $method) {
             
             if ($isGuest) {
                 // 游客访问时，只返回全局设置（user_id IS NULL）
-                $stmt = $db->prepare("SELECT key, value FROM settings WHERE key IN ('items_per_page', 'max_memo_height') AND user_id IS NULL");
+                $stmt = $db->prepare("SELECT key, value FROM settings WHERE key IN ('items_per_page', 'max_memo_height', 'enable_image_compress', 'image_compress_quality', 'enable_smart_exif_detection') AND user_id IS NULL");
                 $stmt->execute();
                 $settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
                 
                 // 如果数据库中没有全局设置，尝试获取任意设置（兼容旧版本数据库）
                 if (empty($settings)) {
-                    $stmt = $db->prepare("SELECT key, value FROM settings WHERE key IN ('items_per_page', 'max_memo_height') LIMIT 2");
+                    $stmt = $db->prepare("SELECT key, value FROM settings WHERE key IN ('items_per_page', 'max_memo_height', 'enable_image_compress', 'image_compress_quality', 'enable_smart_exif_detection') LIMIT 5");
                     $stmt->execute();
                     $settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
                 }
             } else {
                 // 登录用户访问时，获取用户的偏好设置（优先用户设置，其次全局设置）
                 $userId = $_SESSION['user_id'];
-                $stmt = $db->prepare("SELECT key, value FROM settings WHERE key IN ('items_per_page', 'max_memo_height') AND (user_id = ? OR user_id IS NULL)");
+                $stmt = $db->prepare("SELECT key, value FROM settings WHERE key IN ('items_per_page', 'max_memo_height', 'enable_image_compress', 'image_compress_quality', 'enable_smart_exif_detection') AND (user_id = ? OR user_id IS NULL)");
                 $stmt->execute([$userId]);
                 $settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
             }
@@ -1502,7 +1502,10 @@ function handleUserPreferences($db, $method) {
                 'success' => true,
                 'data' => [
                     'items_per_page' => isset($settings['items_per_page']) ? (int)$settings['items_per_page'] : 20,
-                    'max_memo_height' => isset($settings['max_memo_height']) ? (int)$settings['max_memo_height'] : 0
+                    'max_memo_height' => isset($settings['max_memo_height']) ? (int)$settings['max_memo_height'] : 0,
+                    'enable_image_compress' => isset($settings['enable_image_compress']) ? (int)$settings['enable_image_compress'] : 0,
+                    'image_compress_quality' => isset($settings['image_compress_quality']) ? (float)$settings['image_compress_quality'] : 0.8,
+                    'enable_smart_exif_detection' => isset($settings['enable_smart_exif_detection']) ? (int)$settings['enable_smart_exif_detection'] : 0
                 ]
             ]);
             
@@ -1556,6 +1559,52 @@ function handleUserPreferences($db, $method) {
                 // 插入新设置
                 $stmt = $db->prepare("INSERT INTO settings (key, value, user_id) VALUES ('max_memo_height', ?, ?)");
                 $stmt->execute([$maxMemoHeight, $userId]);
+            }
+            
+            // 保存图片压缩开关
+            if (isset($input['enable_image_compress'])) {
+                $enableCompress = $input['enable_image_compress'] ? 1 : 0;
+                
+                // 删除旧设置
+                $stmt = $db->prepare("DELETE FROM settings WHERE key = 'enable_image_compress' AND user_id = ?");
+                $stmt->execute([$userId]);
+                
+                // 插入新设置
+                $stmt = $db->prepare("INSERT INTO settings (key, value, user_id) VALUES ('enable_image_compress', ?, ?)");
+                $stmt->execute([$enableCompress, $userId]);
+            }
+            
+            // 保存图片压缩质量
+            if (isset($input['image_compress_quality'])) {
+                $quality = (float)$input['image_compress_quality'];
+                if ($quality < 0.5 || $quality > 0.95) {
+                    response([
+                        'success' => false,
+                        'error' => '图片压缩质量必须在 0.5 到 0.95 之间'
+                    ], 400);
+                    return;
+                }
+                
+                // 删除旧设置
+                $stmt = $db->prepare("DELETE FROM settings WHERE key = 'image_compress_quality' AND user_id = ?");
+                $stmt->execute([$userId]);
+                
+                // 插入新设置
+                $stmt = $db->prepare("INSERT INTO settings (key, value, user_id) VALUES ('image_compress_quality', ?, ?)");
+                $stmt->execute([$quality, $userId]);
+            }
+            
+            // 保存智能EXIF识别开关
+            if (isset($input['enable_smart_exif_detection'])) {
+                $enableSmartDetection = $input['enable_smart_exif_detection'] ? 1 : 0;
+                
+                // 删除旧设置
+                $stmt = $db->prepare("DELETE FROM settings WHERE key = 'enable_smart_exif_detection' AND user_id = ?");
+                $stmt->execute([$userId]);
+                
+                // 插入新设置
+                $stmt = $db->prepare("INSERT INTO settings (key, value, user_id) VALUES ('enable_smart_exif_detection', ?, ?)");
+                $stmt->execute([$enableSmartDetection, $userId]);
             }
             
             response([

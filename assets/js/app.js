@@ -175,7 +175,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 });
 
 // 初始化发布区 Vditor
-function initPublishVditor() {
+async function initPublishVditor() {
     if (typeof Vditor === 'undefined') {
         console.warn('Vditor未加载');
         return;
@@ -186,6 +186,13 @@ function initPublishVditor() {
     if (!publishElement) {
         console.warn('发布编辑器元素不存在，可能处于公开模式');
         return;
+    }
+    
+    // 动态加载图片压缩模块（仅登录用户需要）
+    try {
+        await loadImageCompressModule();
+    } catch (error) {
+        console.error('加载图片压缩模块失败:', error);
     }
     
     publishVditor = new Vditor('vditorPublish', {
@@ -226,6 +233,52 @@ function initPublishVditor() {
             url: 'api.php?action=upload',
             fieldName: 'file',
             max: 10 * 1024 * 1024,
+            handler: async function(files) {
+                // 动态加载图片压缩模块
+                await loadImageCompressModule();
+                
+                const results = [];
+                
+                for (let file of files) {
+                    try {
+                        // 检查是否启用了图片压缩
+                        const compressSettings = getImageCompressSettings();
+                        if (file.type.startsWith('image/')) {
+                            if (compressSettings.enabled) {
+                                file = await compressImage(file, compressSettings.quality, compressSettings.smartDetection);
+                            } else {
+                                // 即使未启用压缩，也清除EXIF信息（安全优先，使用100%质量）
+                                file = await compressImage(file, 1.0, compressSettings.smartDetection);
+                            }
+                        }
+                        
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        
+                        const response = await fetch('api.php?action=upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        
+                        const result = await response.json();
+                        
+                        if (result.data && result.data.url) {
+                            results.push(result.data.url);
+                        }
+                    } catch (error) {
+                        console.error('上传失败:', error);
+                    }
+                }
+                
+                return JSON.stringify({
+                    msg: '',
+                    code: 0,
+                    data: {
+                        errFiles: [],
+                        succMap: Object.fromEntries(files.map((file, i) => [file.name, results[i]]))
+                    }
+                });
+            },
             format(files, responseText) {
                 const response = JSON.parse(responseText);
                 if (response.data && response.data.url) {
@@ -871,6 +924,49 @@ function showMobilePublishModal() {
                     url: 'api.php?action=upload',
                     fieldName: 'file',
                     max: 10 * 1024 * 1024,
+                    handler: async function(files) {
+                        const results = [];
+                        
+                        for (let file of files) {
+                            try {
+                                // 检查是否启用了图片压缩
+                                const compressSettings = getImageCompressSettings();
+                                if (file.type.startsWith('image/')) {
+                                    if (compressSettings.enabled) {
+                                        file = await compressImage(file, compressSettings.quality);
+                                    } else {
+                                        // 即使未启用压缩，也清除EXIF信息（安全优先，使用100%质量）
+                                        file = await compressImage(file, 1.0);
+                                    }
+                                }
+                                
+                                const formData = new FormData();
+                                formData.append('file', file);
+                                
+                                const response = await fetch('api.php?action=upload', {
+                                    method: 'POST',
+                                    body: formData
+                                });
+                                
+                                const result = await response.json();
+                                
+                                if (result.data && result.data.url) {
+                                    results.push(result.data.url);
+                                }
+                            } catch (error) {
+                                console.error('上传失败:', error);
+                            }
+                        }
+                        
+                        return JSON.stringify({
+                            msg: '',
+                            code: 0,
+                            data: {
+                                errFiles: [],
+                                succMap: Object.fromEntries(files.map((file, i) => [file.name, results[i]]))
+                            }
+                        });
+                    },
                     format(files, responseText) {
                         const response = JSON.parse(responseText);
                         if (response.data && response.data.url) {
@@ -946,13 +1042,29 @@ function removeMobileTag(index) {
 
 // 移动端：上传图片
 async function uploadImageToMobile(input) {
-    const file = input.files[0];
+    let file = input.files[0];
     if (!file) return;
     
-    const formData = new FormData();
-    formData.append('file', file);
-    
     try {
+        // 动态加载图片压缩模块
+        await loadImageCompressModule();
+        
+        // 检查是否启用了图片压缩
+        const compressSettings = getImageCompressSettings();
+        if (file.type.startsWith('image/')) {
+            if (compressSettings.enabled) {
+                showToast('正在压缩图片...', 'info');
+                file = await compressImage(file, compressSettings.quality, compressSettings.smartDetection);
+            } else {
+                // 即使未启用压缩，也清除EXIF信息（安全优先，使用100%质量）
+                showToast('正在清除EXIF信息...', 'info');
+                file = await compressImage(file, 1.0, compressSettings.smartDetection);
+            }
+        }
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        
         const response = await fetch('api.php?action=upload', {
             method: 'POST',
             body: formData
@@ -965,6 +1077,7 @@ async function uploadImageToMobile(input) {
                 const markdown = `![${result.data.original_name}](${result.data.url})`;
                 mobileVditor.insertValue(markdown);
             }
+            showToast('上传成功', 'success');
         }
     } catch (error) {
         console.error('上传图片失败:', error);
@@ -2015,6 +2128,44 @@ async function editInPlace(id) {
                         url: 'api.php?action=upload',
                         fieldName: 'file',
                         max: 10 * 1024 * 1024, // 10MB
+                        handler: async function(files) {
+                            const results = [];
+                            
+                            for (let file of files) {
+                                try {
+                                    // 检查是否启用了图片压缩
+                                    const compressSettings = getImageCompressSettings();
+                                    if (compressSettings.enabled && file.type.startsWith('image/')) {
+                                        file = await compressImage(file, compressSettings.quality);
+                                    }
+                                    
+                                    const formData = new FormData();
+                                    formData.append('file', file);
+                                    
+                                    const response = await fetch('api.php?action=upload', {
+                                        method: 'POST',
+                                        body: formData
+                                    });
+                                    
+                                    const result = await response.json();
+                                    
+                                    if (result.data && result.data.url) {
+                                        results.push(result.data.url);
+                                    }
+                                } catch (error) {
+                                    console.error('上传失败:', error);
+                                }
+                            }
+                            
+                            return JSON.stringify({
+                                msg: '',
+                                code: 0,
+                                data: {
+                                    errFiles: [],
+                                    succMap: Object.fromEntries(files.map((file, i) => [file.name, results[i]]))
+                                }
+                            });
+                        },
                         format(files, responseText) {
                             const response = JSON.parse(responseText);
                             if (response.data && response.data.url) {
@@ -2321,13 +2472,29 @@ async function updateContentFilters() {
 
 // 上传图片到发布区
 async function uploadImageToPublish(input) {
-    const file = input.files[0];
+    let file = input.files[0];
     if (!file) return;
     
-    const formData = new FormData();
-    formData.append('file', file);
-    
     try {
+        // 动态加载图片压缩模块
+        await loadImageCompressModule();
+        
+        // 检查是否启用了图片压缩
+        const compressSettings = getImageCompressSettings();
+        if (file.type.startsWith('image/')) {
+            if (compressSettings.enabled) {
+                showToast('正在压缩图片...', 'info');
+                file = await compressImage(file, compressSettings.quality, compressSettings.smartDetection);
+            } else {
+                // 即使未启用压缩，也清除EXIF信息（安全优先，使用100%质量）
+                showToast('正在清除EXIF信息...', 'info');
+                file = await compressImage(file, 1.0, compressSettings.smartDetection);
+            }
+        }
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        
         const response = await fetch('api.php?action=upload', {
             method: 'POST',
             body: formData
@@ -2341,6 +2508,7 @@ async function uploadImageToPublish(input) {
                 const markdown = `![${result.data.original_name}](${result.data.url})`;
                 publishVditor.insertValue(markdown);
             }
+            showToast('上传成功', 'success');
         }
     } catch (error) {
         console.error('上传图片失败:', error);
@@ -3813,6 +3981,13 @@ async function loadSettings() {
     memoList.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
     
     try {
+        // 动态加载图片压缩模块（设置页面需要相关函数）
+        try {
+            await loadImageCompressModule();
+        } catch (error) {
+            console.error('加载图片压缩模块失败，使用降级方案:', error);
+        }
+        
         // 模拟加载延迟
         await new Promise(resolve => setTimeout(resolve, 300));
         
@@ -3899,6 +4074,77 @@ async function loadSettings() {
             <span style="font-size: 13px; color: var(--text-muted);">0表示不限制，建议500-1000</span>
         `;
         html += '</div>';
+        html += '</div>';
+        
+        html += '</div>';
+        html += '</div>';
+        
+        // 图片上传设置部分
+        html += '<div style="margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid var(--border-color);">';
+        html += '<h3 style="font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 15px;">图片上传</h3>';
+        html += '<div style="display: flex; flex-direction: column; gap: 12px;">';
+        
+        // 获取图片压缩设置（使用降级方案）
+        const imageCompressSettings = typeof getImageCompressSettings === 'function' 
+            ? getImageCompressSettings() 
+            : { enabled: userPreferences.enable_image_compress === 1, quality: userPreferences.image_compress_quality || 0.8, smartDetection: userPreferences.enable_smart_exif_detection === 1 };
+        const isCompressEnabled = imageCompressSettings.enabled;
+        const compressQuality = imageCompressSettings.quality;
+        const isSmartDetectionEnabled = imageCompressSettings.smartDetection;
+        
+        // 图片压缩开关
+        html += '<div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">';
+        html += '<label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">';
+        html += `<input type="checkbox" id="enableImageCompress" ${isCompressEnabled ? 'checked' : ''} onchange="toggleImageCompress()" style="cursor: pointer;">`;
+        html += '<span style="font-size: 14px; color: var(--text-primary);">启用图片压缩</span>';
+        html += '</label>';
+        html += '<span style="font-size: 13px; color: var(--text-muted);">上传前自动压缩图片以节省空间</span>';
+        html += '</div>';
+        
+        // 智能EXIF识别开关
+        html += '<div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 10px;">';
+        html += '<label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">';
+        html += `<input type="checkbox" id="enableSmartExifDetection" ${isSmartDetectionEnabled ? 'checked' : ''} onchange="toggleSmartExifDetection()" style="cursor: pointer;">`;
+        html += '<span style="font-size: 14px; color: var(--text-primary);">智能EXIF识别</span>';
+        html += '</label>';
+        html += '<span style="font-size: 13px; color: var(--text-muted);">压缩后更大时，若无敏感信息则保留原图</span>';
+        html += '</div>';
+        
+        // 压缩说明
+        html += '<div style="background: var(--background); padding: 12px; border-radius: 6px; border-left: 3px solid var(--primary-color); margin-top: 8px;">';
+        html += '<p style="font-size: 13px; color: var(--text-secondary); margin: 0; line-height: 1.6;">';
+        html += '💡 <strong>智能压缩策略：</strong><br>';
+        html += '• PNG图片（质量＜95%）会自动转换为JPEG格式以获得更好的压缩效果<br>';
+        html += '• 大于1920px的图片会自动等比缩小<br>';
+        html += '• GIF动图和SVG矢量图不会被压缩<br>';
+        html += '• 浏览器控制台会显示详细的压缩日志<br>';
+        html += '<br>🔒 <strong>隐私保护：</strong><br>';
+        html += '• 默认情况下，所有图片都会清除EXIF信息（GPS位置、相机型号、拍摄时间等）<br>';
+        html += '• 启用"智能EXIF识别"后，无敏感信息的图片可保留原图（仅在压缩后更大时）<br>';
+        html += '• 即使关闭压缩，也会检测并清除敏感EXIF信息';
+        html += '</p>';
+        html += '</div>';
+        
+        // 压缩质量设置
+        html += `<div id="compressQualitySection" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color); ${isCompressEnabled ? '' : 'display: none;'}">`;
+        html += '<p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 8px;">压缩质量（数字越大质量越好，文件越大）</p>';
+        html += '<div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">';
+        html += `
+            <input type="range" 
+                   id="imageCompressQuality" 
+                   min="0.5" 
+                   max="0.95" 
+                   step="0.05" 
+                   value="${compressQuality}"
+                   oninput="updateQualityDisplay(this.value)"
+                   style="flex: 1; max-width: 200px; min-width: 150px;">
+            <span id="qualityDisplay" style="font-size: 14px; color: var(--text-primary); min-width: 45px; font-weight: 600;">${Math.round(compressQuality * 100)}%</span>
+            <button class="btn-primary" onclick="saveImageCompressSettings()" style="padding: 8px 16px; font-size: 14px;">
+                保存质量
+            </button>
+        `;
+        html += '</div>';
+        html += '<p style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">推荐：75%-85%（平衡质量与文件大小），95%（接近无损）<br>💡 提示：压缩开关会自动保存，只需点击按钮保存压缩质量即可</p>';
         html += '</div>';
         
         html += '</div>';
@@ -5740,12 +5986,16 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 // ==================== 分页数设置功能 ====================
 
-// 用户偏好设置缓存
-let userPreferences = {
+// 用户偏好设置缓存（绑定到全局，供image-compress.js模块使用）
+window.userPreferences = {
     items_per_page: 20,
     max_memo_height: 0,
+    enable_image_compress: 0,
+    image_compress_quality: 0.8,
+    enable_smart_exif_detection: 0,
     loaded: false
 };
+let userPreferences = window.userPreferences; // 保持向后兼容
 
 // 加载用户偏好设置
 async function loadUserPreferences() {
@@ -5760,10 +6010,13 @@ async function loadUserPreferences() {
         console.log('用户偏好设置API响应:', result);
         
         if (result.success) {
-            userPreferences.items_per_page = result.data.items_per_page;
-            userPreferences.max_memo_height = result.data.max_memo_height;
-            userPreferences.loaded = true;
-            console.log('用户偏好设置已加载:', userPreferences);
+            window.userPreferences.items_per_page = result.data.items_per_page;
+            window.userPreferences.max_memo_height = result.data.max_memo_height;
+            window.userPreferences.enable_image_compress = result.data.enable_image_compress || 0;
+            window.userPreferences.image_compress_quality = result.data.image_compress_quality || 0.8;
+            window.userPreferences.enable_smart_exif_detection = result.data.enable_smart_exif_detection || 0;
+            window.userPreferences.loaded = true;
+            console.log('用户偏好设置已加载:', window.userPreferences);
         } else {
             console.error('加载用户偏好设置失败:', result.error);
         }
@@ -5803,7 +6056,7 @@ async function saveItemsPerPage() {
         const result = await response.json();
         
         if (result.success) {
-            userPreferences.items_per_page = value;
+            window.userPreferences.items_per_page = value;
             showToast('保存成功！', 'success');
             
             // 重新加载当前视图
@@ -5850,7 +6103,7 @@ async function saveMaxMemoHeight() {
         const result = await response.json();
         
         if (result.success) {
-            userPreferences.max_memo_height = value;
+            window.userPreferences.max_memo_height = value;
             showToast('保存成功！刷新页面后生效', 'success');
         } else {
             showToast('保存失败：' + result.error, 'error');
@@ -5859,6 +6112,41 @@ async function saveMaxMemoHeight() {
         console.error('保存设置失败:', error);
         showToast('保存失败：' + error.message, 'error');
     }
+}
+
+// ==================== 图片压缩模块动态加载 ====================
+
+// 动态加载图片压缩模块
+let imageCompressModuleLoading = null; // 防止重复加载
+
+async function loadImageCompressModule() {
+    // 如果已经加载过，直接返回
+    if (window.imageCompressModuleLoaded) {
+        return true;
+    }
+    
+    // 如果正在加载中，等待加载完成
+    if (imageCompressModuleLoading) {
+        return imageCompressModuleLoading;
+    }
+    
+    imageCompressModuleLoading = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'assets/js/image-compress.js?v=' + Date.now(); // 添加版本号避免缓存
+        script.onload = () => {
+            console.log('✅ 图片压缩模块已动态加载');
+            imageCompressModuleLoading = null;
+            resolve(true);
+        };
+        script.onerror = () => {
+            console.error('❌ 图片压缩模块加载失败');
+            imageCompressModuleLoading = null;
+            reject(new Error('图片压缩模块加载失败'));
+        };
+        document.head.appendChild(script);
+    });
+    
+    return imageCompressModuleLoading;
 }
 
 // ==================== 主题切换功能 ====================
