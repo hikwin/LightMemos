@@ -237,10 +237,10 @@ async function initPublishVditor() {
                 // 动态加载图片压缩模块
                 await loadImageCompressModule();
                 
-                const results = [];
-                
                 for (let file of files) {
                     try {
+                        const originalFileName = file.name;
+                        
                         // 检查是否启用了图片压缩
                         const compressSettings = getImageCompressSettings();
                         if (file.type.startsWith('image/')) {
@@ -263,21 +263,17 @@ async function initPublishVditor() {
                         const result = await response.json();
                         
                         if (result.data && result.data.url) {
-                            results.push(result.data.url);
+                            // 手动插入图片到编辑器
+                            const imageMarkdown = `![${originalFileName}](${result.data.url})`;
+                            publishVditor.insertValue(imageMarkdown);
                         }
                     } catch (error) {
                         console.error('上传失败:', error);
                     }
                 }
                 
-                return JSON.stringify({
-                    msg: '',
-                    code: 0,
-                    data: {
-                        errFiles: [],
-                        succMap: Object.fromEntries(files.map((file, i) => [file.name, results[i]]))
-                    }
-                });
+                // 返回 null，防止显示提示消息
+                return null;
             },
             format(files, responseText) {
                 const response = JSON.parse(responseText);
@@ -925,10 +921,10 @@ function showMobilePublishModal() {
                     fieldName: 'file',
                     max: 10 * 1024 * 1024,
                     handler: async function(files) {
-                        const results = [];
-                        
                         for (let file of files) {
                             try {
+                                const originalFileName = file.name;
+                                
                                 // 检查是否启用了图片压缩
                                 const compressSettings = getImageCompressSettings();
                                 if (file.type.startsWith('image/')) {
@@ -951,21 +947,17 @@ function showMobilePublishModal() {
                                 const result = await response.json();
                                 
                                 if (result.data && result.data.url) {
-                                    results.push(result.data.url);
+                                    // 手动插入图片到编辑器
+                                    const imageMarkdown = `![${originalFileName}](${result.data.url})`;
+                                    mobileVditor.insertValue(imageMarkdown);
                                 }
                             } catch (error) {
                                 console.error('上传失败:', error);
                             }
                         }
                         
-                        return JSON.stringify({
-                            msg: '',
-                            code: 0,
-                            data: {
-                                errFiles: [],
-                                succMap: Object.fromEntries(files.map((file, i) => [file.name, results[i]]))
-                            }
-                        });
+                        // 返回 null，防止显示提示消息
+                        return null;
                     },
                     format(files, responseText) {
                         const response = JSON.parse(responseText);
@@ -2106,8 +2098,7 @@ async function editInPlace(id) {
                         'list',
                         'ordered-list',
                         'check',
-                        'outdent',
-                        'indent',
+                        'upload',
                         '|',
                         'quote',
                         'line',
@@ -2129,10 +2120,10 @@ async function editInPlace(id) {
                         fieldName: 'file',
                         max: 10 * 1024 * 1024, // 10MB
                         handler: async function(files) {
-                            const results = [];
-                            
                             for (let file of files) {
                                 try {
+                                    const originalFileName = file.name;
+                                    
                                     // 检查是否启用了图片压缩
                                     const compressSettings = getImageCompressSettings();
                                     if (compressSettings.enabled && file.type.startsWith('image/')) {
@@ -2150,21 +2141,17 @@ async function editInPlace(id) {
                                     const result = await response.json();
                                     
                                     if (result.data && result.data.url) {
-                                        results.push(result.data.url);
+                                        // 手动插入图片到编辑器
+                                        const imageMarkdown = `![${originalFileName}](${result.data.url})`;
+                                        vditorInstance.insertValue(imageMarkdown);
                                     }
                                 } catch (error) {
                                     console.error('上传失败:', error);
                                 }
                             }
                             
-                            return JSON.stringify({
-                                msg: '',
-                                code: 0,
-                                data: {
-                                    errFiles: [],
-                                    succMap: Object.fromEntries(files.map((file, i) => [file.name, results[i]]))
-                                }
-                            });
+                            // 返回 null，防止显示提示消息
+                            return null;
                         },
                         format(files, responseText) {
                             const response = JSON.parse(responseText);
