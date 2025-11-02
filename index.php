@@ -242,9 +242,7 @@ if (!defined('DB_PATH') || !file_exists(DB_PATH)) {
     <link rel="apple-touch-icon" sizes="180x180" href="favicon.svg">
     <meta name="theme-color" content="#667eea">
     <link rel="stylesheet" href="assets/css/style.css">
-    <!-- Marked.js - Markdown 解析器 -->
-    <script src="assets/vendor/marked/marked.min.js"></script>
-    <!-- Prism.js - 代码高亮 -->
+    <!-- Prism.js - 代码高亮（保留用于代码块复制功能） -->
     <link rel="stylesheet" href="assets/vendor/prism/themes/prism.min.css">
     <script src="assets/vendor/prism/components/prism-core.min.js"></script>
     <script src="assets/vendor/prism/plugins/autoloader/prism-autoloader.min.js"></script>
@@ -293,14 +291,6 @@ if (!defined('DB_PATH') || !file_exists(DB_PATH)) {
                     </svg>
                     <span>时间线</span>
                 </a>
-                <?php if (isset($_SESSION['user_id'])): ?>
-                <a href="#" class="nav-item" data-view="attachments">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M13.234 20.252 21 12.3"></path>
-                        <path d="m16 6-8.414 8.586a2 2 0 0 0 0 2.828 2 2 0 0 0 2.828 0l8.414-8.586a4 4 0 0 0 0-5.656 4 4 0 0 0-5.656 0l-8.415 8.585a6 6 0 1 0 8.486 8.486"></path>
-                    </svg>
-                    <span>附件</span>
-                </a>
                 <a href="#" class="nav-item" data-view="stats">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M3 3v18h18"></path>
@@ -309,6 +299,14 @@ if (!defined('DB_PATH') || !file_exists(DB_PATH)) {
                         <path d="M8 17v-3"></path>
                     </svg>
                     <span>统计</span>
+                </a>
+                <?php if (isset($_SESSION['user_id'])): ?>
+                <a href="#" class="nav-item" data-view="attachments">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M13.234 20.252 21 12.3"></path>
+                        <path d="m16 6-8.414 8.586a2 2 0 0 0 0 2.828 2 2 0 0 0 2.828 0l8.414-8.586a4 4 0 0 0 0-5.656 4 4 0 0 0-5.656 0l-8.415 8.585a6 6 0 1 0 8.486 8.486"></path>
+                    </svg>
+                    <span>附件</span>
                 </a>
                 <a href="#" class="nav-item" data-view="shares">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1148,6 +1146,37 @@ print(result)</code></pre>
         </div>
     </div>
     
+    <!-- 文本标记悬浮按钮 -->
+    <button id="textMarkBtn" class="text-mark-btn" style="display: none;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+        </svg>
+        标记
+    </button>
+    
+    <!-- 编辑笔记模态框（独立样式，不使用通用modal） -->
+    <div id="editMemoModal" class="edit-memo-modal">
+        <div class="edit-memo-overlay" onclick="hideEditMemoModal()"></div>
+        <div class="edit-memo-container">
+            <div class="edit-memo-header">
+                <h2>编辑笔记</h2>
+                <button class="edit-memo-close" onclick="hideEditMemoModal()">&times;</button>
+            </div>
+            <div class="edit-memo-info">
+                <span id="editMemoTime" class="edit-time-info"></span>
+            </div>
+            <div class="edit-memo-body">
+                <input type="hidden" id="editMemoId">
+                <div id="vditorEdit"></div>
+            </div>
+            <div class="edit-memo-footer">
+                <button type="button" class="btn-secondary" onclick="hideEditMemoModal()">取消</button>
+                <button type="button" class="btn-primary" onclick="saveEditedMemo()">保存</button>
+            </div>
+        </div>
+    </div>
+    
     <!-- 编辑标签模态框 -->
     <div id="editTagsModal" class="modal">
         <div class="modal-content">
@@ -1177,6 +1206,8 @@ print(result)</code></pre>
     <link rel="stylesheet" href="assets/vendor/vditor/index.css">
     <!-- Vditor 内容主题 -->
     <link rel="stylesheet" href="assets/vendor/vditor/dist/css/content-theme/light.css">
+    <!-- KaTeX 样式文件 - 用于数学公式渲染 -->
+    <link rel="stylesheet" href="assets/vendor/vditor/dist/js/katex/katex.min.css">
     
     <!-- 移动端底部浮动发布按钮 -->
     <?php if (isset($_SESSION['user_id'])): ?>

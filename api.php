@@ -522,13 +522,30 @@ function handleMemo($db, $method) {
 // 处理标签
 function handleTags($db, $method) {
     if ($method === 'GET') {
-        $stmt = $db->query("
-            SELECT t.*, COUNT(mt.memo_id) as count 
-            FROM tags t 
-            LEFT JOIN memo_tags mt ON t.id = mt.tag_id 
-            GROUP BY t.id 
-            ORDER BY count DESC, t.name ASC
-        ");
+        // 检查是否为游客访问
+        $isGuest = !isset($_SESSION['user_id']);
+        
+        if ($isGuest) {
+            // 游客访问时，只统计公开文章的标签
+            $stmt = $db->query("
+                SELECT t.*, COUNT(DISTINCT mt.memo_id) as count 
+                FROM tags t 
+                LEFT JOIN memo_tags mt ON t.id = mt.tag_id 
+                LEFT JOIN memos m ON mt.memo_id = m.id 
+                WHERE m.visibility = 'public' AND m.archived = 0
+                GROUP BY t.id 
+                ORDER BY count DESC, t.name ASC
+            ");
+        } else {
+            // 登录用户，统计所有文章的标签
+            $stmt = $db->query("
+                SELECT t.*, COUNT(mt.memo_id) as count 
+                FROM tags t 
+                LEFT JOIN memo_tags mt ON t.id = mt.tag_id 
+                GROUP BY t.id 
+                ORDER BY count DESC, t.name ASC
+            ");
+        }
         
         $tags = $stmt->fetchAll(PDO::FETCH_ASSOC);
         response(['data' => $tags]);
@@ -799,14 +816,29 @@ function handleStats($db, $method) {
         ")->fetchAll(PDO::FETCH_ASSOC);
         
         // 标签统计
-        $tagStats = $db->query("
-            SELECT t.name, COUNT(mt.memo_id) as count 
-            FROM tags t 
-            LEFT JOIN memo_tags mt ON t.id = mt.tag_id 
-            GROUP BY t.id 
-            ORDER BY count DESC 
-            LIMIT 10
-        ")->fetchAll(PDO::FETCH_ASSOC);
+        if ($isGuest) {
+            // 游客访问时，只统计公开文章的标签
+            $tagStats = $db->query("
+                SELECT t.name, COUNT(DISTINCT mt.memo_id) as count 
+                FROM tags t 
+                LEFT JOIN memo_tags mt ON t.id = mt.tag_id 
+                LEFT JOIN memos m ON mt.memo_id = m.id 
+                WHERE m.visibility = 'public' AND m.archived = 0
+                GROUP BY t.id 
+                ORDER BY count DESC 
+                LIMIT 10
+            ")->fetchAll(PDO::FETCH_ASSOC);
+        } else {
+            // 登录用户，统计所有文章的标签
+            $tagStats = $db->query("
+                SELECT t.name, COUNT(mt.memo_id) as count 
+                FROM tags t 
+                LEFT JOIN memo_tags mt ON t.id = mt.tag_id 
+                GROUP BY t.id 
+                ORDER BY count DESC 
+                LIMIT 10
+            ")->fetchAll(PDO::FETCH_ASSOC);
+        }
         
         // 使用天数（第一篇笔记到现在的天数）
         $firstMemoDate = $db->query("
@@ -861,21 +893,27 @@ function handleStats($db, $method) {
             }
         }
         
-        response([
-            'data' => [
-                'total_memos' => (int)$totalMemos,
-                'total_tags' => (int)$totalTags,
-                'total_attachments' => (int)$totalAttachments,
-                'week_memos' => (int)$weekMemos,
-                'month_memos' => (int)$monthMemos,
-                'year_memos' => (int)$yearMemos,
-                'usage_days' => $usageDays,
-                'record_days' => $recordDays,
-                'consecutive_days' => $consecutiveDays,
-                'daily_stats' => $dailyStats,
-                'tag_stats' => $tagStats
-            ]
-        ]);
+        // 组装响应数据：游客隐藏“总标签数/总附件数/连续记录”
+        $data = [
+            'total_memos' => (int)$totalMemos,
+            'week_memos' => (int)$weekMemos,
+            'month_memos' => (int)$monthMemos,
+            'year_memos' => (int)$yearMemos,
+            'usage_days' => $usageDays,
+            'record_days' => $recordDays,
+            'daily_stats' => $dailyStats,
+        ];
+
+        if (!$isGuest) {
+            $data['total_tags'] = (int)$totalTags;
+            $data['total_attachments'] = (int)$totalAttachments;
+            $data['consecutive_days'] = $consecutiveDays;
+            $data['tag_stats'] = $tagStats;
+        } else {
+            // 游客仍可看到热门标签列表吗？如需隐藏，保持不返回
+        }
+
+        response(['data' => $data]);
     }
 }
 
@@ -2906,11 +2944,11 @@ function handleCleanUnusedImages($db, $method) {
                 // 未被引用，删除附件
                 
                 // 删除物理文件
-                $filePath = $attachment['file_path'];
+                $filePath = UPLOAD_DIR . $attachment['filename'];
                 if (file_exists($filePath)) {
-                    $fileSize = filesize($filePath);
-                    if (unlink($filePath)) {
-                        $freedSpace += $fileSize;
+                    $fileSize = @filesize($filePath) ?: 0;
+                    if (@unlink($filePath)) {
+                        $freedSpace += (int)$fileSize;
                     }
                 }
                 

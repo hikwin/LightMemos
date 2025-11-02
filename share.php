@@ -111,12 +111,16 @@ if ($passOK) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>分享查看</title>
     <link rel="stylesheet" href="assets/css/style.css">
-    <!-- Marked.js - Markdown 解析器 -->
-    <script src="assets/vendor/marked/marked.min.js"></script>
-    <!-- Prism.js - 代码高亮 -->
+    <!-- Prism.js - 代码高亮（保留用于代码块复制功能） -->
     <link rel="stylesheet" href="assets/vendor/prism/themes/prism.min.css">
     <script src="assets/vendor/prism/components/prism-core.min.js"></script>
     <script src="assets/vendor/prism/plugins/autoloader/prism-autoloader.min.js"></script>
+    <!-- Vditor 预览渲染支持（数学公式、Graphviz、Mermaid等） -->
+    <link rel="stylesheet" href="assets/vendor/vditor/index.css">
+    <link rel="stylesheet" href="assets/vendor/vditor/dist/css/content-theme/light.css">
+    <link rel="stylesheet" href="assets/vendor/vditor/dist/js/katex/katex.min.css">
+    <script src="assets/vendor/vditor/dist/js/i18n/zh_CN.js"></script>
+    <script src="assets/vendor/vditor/index.min.js"></script>
 </head>
 <body style="background:#f8f9fa;">
     <div style="max-width: 800px; margin: 40px auto; background: #fff; border-radius: 12px; box-shadow: var(--shadow); padding: 24px;">
@@ -160,15 +164,45 @@ if ($passOK) {
                 <script>
                 (function(){
                     const raw = <?php echo json_encode($memo['content'] ?? '', JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
-                    if (typeof marked !== 'undefined') {
-                        const html = marked.parse(raw);
-                        const container = document.getElementById('memoContentHtml');
-                        container.innerHTML = html;
-                        if (typeof Prism !== 'undefined') {
-                            container.querySelectorAll('pre code').forEach(block => Prism.highlightElement(block));
+                    const container = document.getElementById('memoContentHtml');
+                    
+                    // 优先使用 Vditor 预览渲染（支持数学公式、Graphviz、Mermaid等）
+                    if (typeof Vditor !== 'undefined' && typeof Vditor.preview === 'function') {
+                        try {
+                            container.className = 'memo-content vditor-reset';
+                            // 使用 Vditor.preview() 方法（注意是大写V，直接方法）
+                            Vditor.preview(container, raw, {
+                                cdn: './assets/vendor/vditor',
+                                math: {
+                                    engine: 'KaTeX',
+                                    inlineDigit: true
+                                },
+                                markdown: {
+                                    toc: true,
+                                    mark: true,
+                                    footnotes: true,
+                                    autoSpace: true
+                                },
+                                speech: {
+                                    enable: false
+                                },
+                                hljs: {
+                                    enable: false  // 禁用 highlight.js，使用 Prism.js
+                                },
+                                mode: 'light',
+                                after: () => {
+                                    console.log('✅ 分享页面 Vditor 渲染完成');
+                                }
+                            });
+                        } catch (error) {
+                            console.error('❌ Vditor预览渲染失败:', error);
+                            // 如果渲染失败，显示纯文本
+                            container.innerText = raw;
                         }
                     } else {
-                        document.getElementById('memoContentHtml').innerText = raw;
+                        // Vditor 未加载，显示纯文本
+                        console.warn('Vditor 未加载');
+                        container.innerText = raw;
                     }
                 })();
                 </script>

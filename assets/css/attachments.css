@@ -1,0 +1,70 @@
+.attachment-search-container { margin-bottom: 20px; display: flex; gap: 10px; align-items: center; }
+.attachment-type-filter { padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--background); color: var(--text-primary); }
+.attachment-type-filter:focus { border-color: var(--primary-color); }
+.attachment-search-box { position: relative; display: flex; align-items: center; flex: 1; }
+.attachment-search-box input { width: 100%; padding: 12px 40px 12px 12px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--background); color: var(--text-primary); }
+.attachment-search-box input:focus { border-color: var(--primary-color); }
+.attachment-view-toggle { display: flex; gap: 4px; }
+.view-toggle-btn { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--background); color: var(--text-primary); cursor: pointer; }
+.view-toggle-btn:hover { border-color: var(--primary-color); color: var(--primary-color); }
+.view-toggle-btn.active { background: rgba(102, 126, 234, 0.1); border-color: var(--primary-color); color: var(--primary-color); }
+.attachment-search-box svg { position: absolute; right: 12px; width: 18px; height: 18px; color: var(--text-secondary); cursor: pointer; }
+.attachment-search-box svg:hover { color: var(--primary-color); }
+.attachment-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+.attachment-list { display: flex; flex-direction: column; gap: 10px; }
+.attachment-list-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--background); transition: box-shadow .2s, transform .2s, border-color .2s; }
+.attachment-list-item:hover { border-color: var(--primary-color); box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1); }
+.attachment-list-icon { width: 40px; height: 40px; border-radius: 6px; background: #f6f6f7; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.attachment-list-icon svg { width: 24px; height: 24px; }
+.attachment-list-thumbnail { width: 100%; height: 100%; object-fit: cover; }
+.attachment-list-info { flex: 1; min-width: 0; }
+.attachment-list-name { font-size: 14px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attachment-list-meta { font-size: 12px; color: var(--text-muted); }
+.attachment-list-actions { display: flex; gap: 6px; }
+.attachment-list-btn { width: 32px; height: 32px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--background); color: var(--text-secondary); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all .15s ease; }
+.attachment-list-btn:hover { background: var(--primary-color); color: white; border-color: var(--primary-color); }
+.attachment-list-btn.danger:hover { background: #dc2626; border-color: #dc2626; }
+.attachment-list-btn svg { width: 16px; height: 16px; }
+.attachment-item-image, .attachment-item-file { background: white; border-radius: 12px; padding: 12px; box-shadow: var(--shadow); transition: box-shadow .2s, transform .2s; }
+.attachment-item-image:hover, .attachment-item-file:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+.attachment-item-image { position: relative; overflow: hidden; }
+.attachment-thumbnail { width: 100%; height: 150px; object-fit: cover; border-radius: 8px; margin-bottom: 10px; background: #f3f4f6; }
+.attachment-icon { display: flex; justify-content: center; align-items: center; height: 120px; margin-bottom: 10px; }
+.attachment-icon svg { width: 48px; height: 48px; }
+.attachment-name { font-size: 13px; color: var(--text-primary); text-align: center; margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attachment-delete-btn { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 50%; background: rgba(220, 38, 38, .9); color: white; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; opacity: .95; transform: scale(1); transition: all .15s ease; }
+.attachment-item-image:hover .attachment-delete-btn, .attachment-item-file:hover .attachment-delete-btn { opacity: 1; transform: scale(1); }
+.attachment-delete-btn:hover { background: rgba(220, 38, 38, 1); transform: scale(1.1); }
+.attachment-delete-btn svg { width: 18px; height: 18px; }
+.attachment-pagination { margin-top: 25px; padding-top: 20px; border-top: 1px solid var(--border-color); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+.pagination-info { font-size: 13px; color: var(--text-secondary); }
+.pagination-controls { display: flex; align-items: center; gap: 8px; }
+.per-page-select { padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--background); color: var(--text-primary); }
+.pagination-btn { width: 36px; height: 36px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--background); color: var(--text-primary); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.pagination-btn[disabled] { opacity: .5; cursor: not-allowed; }
+
+[data-theme="dark"] .attachment-item-image,
+[data-theme="dark"] .attachment-item-file { background: var(--sidebar-bg); }
+[data-theme="dark"] .attachment-list-item { background: var(--sidebar-bg); }
+[data-theme="dark"] .attachment-list-icon { background: var(--background); }
+[data-theme="dark"] .attachment-list-btn { background: var(--background); }
+[data-theme="dark"] .attachment-search-box input { background: #1a1a1a; }
+
+@media (max-width: 768px) {
+	.attachment-search-container { flex-wrap: wrap; }
+	.attachment-view-toggle { order: 3; width: 100%; justify-content: flex-start; margin-top: 6px; }
+	.attachment-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
+	.attachment-item-image, .attachment-item-file { padding: 10px; border-radius: 8px; }
+	.attachment-thumbnail { height: 100px; margin-bottom: 8px; }
+	.attachment-name { font-size: 12px; line-height: 1.3; }
+	.attachment-icon { height: 80px; margin-bottom: 8px; }
+	.attachment-icon svg { width: 36px; height: 36px; }
+	.attachment-delete-btn { width: 26px; height: 26px; }
+	.attachment-delete-btn svg { width: 14px; height: 14px; }
+	.attachment-delete-btn:active { background: rgba(220, 38, 38, 1); transform: scale(0.95); }
+	.attachment-list-item { padding: 8px 10px; gap: 10px; }
+	.attachment-list-icon { width: 36px; height: 36px; }
+	.attachment-list-name { font-size: 13px; }
+	.attachment-list-meta { font-size: 11px; }
+}
+

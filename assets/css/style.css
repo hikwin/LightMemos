@@ -5,6 +5,45 @@
     box-sizing: border-box;
 }
 
+/* 全局现代化滚动条样式 */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.12);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.25);
+    background-clip: padding-box;
+}
+
+/* 暗色模式下的全局滚动条 */
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    background-clip: padding-box;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.25);
+    background-clip: padding-box;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-track {
+    background: transparent;
+}
+
 /* 统计页面样式 */
 .stats-grid {
     display: grid;
@@ -612,6 +651,597 @@
     background: white;
 }
 
+/* ============================================
+   编辑笔记弹窗 - 独立样式（不使用通用modal）
+   ============================================ */
+
+/* 弹窗遮罩层 */
+.edit-memo-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+    overflow: hidden;
+}
+
+.edit-memo-modal.show {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 半透明背景 */
+.edit-memo-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 1;
+}
+
+/* 弹窗容器 - 居中显示 */
+.edit-memo-container {
+    position: relative;
+    width: 90%;
+    height: 90vh;
+    max-width: 1400px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-30px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* 弹窗头部 */
+.edit-memo-header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-color);
+    background: #f8f9fa;
+}
+
+.edit-memo-header h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.edit-memo-close {
+    background: none;
+    border: none;
+    font-size: 28px;
+    line-height: 1;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.edit-memo-close:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-primary);
+}
+
+/* 编辑信息栏 - 显示最后编辑时间 */
+.edit-memo-info {
+    flex-shrink: 0;
+    padding: 10px 24px;
+    background: #fafbfc;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.edit-time-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.edit-time-info::before {
+    content: "⏱";
+    font-size: 14px;
+}
+
+/* 弹窗主体 - 编辑器区域 */
+.edit-memo-body {
+    flex: 1;
+    overflow: hidden;
+    padding: 0;
+    background: white;
+}
+
+.edit-memo-body #vditorEdit {
+    height: 100%;
+}
+
+/* 弹窗底部 - 按钮区域 */
+.edit-memo-footer {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 16px 24px;
+    border-top: 1px solid var(--border-color);
+    background: #f8f9fa;
+}
+
+/* 编辑器样式隔离 */
+.edit-memo-modal .vditor {
+    border: none !important;
+    border-radius: 0 !important;
+    height: 100% !important;
+}
+
+.edit-memo-modal .vditor-toolbar {
+    background: #ffffff !important;
+    border-bottom: 1px solid #e5e7eb !important;
+    padding: 8px 12px !important;
+}
+
+.edit-memo-modal .vditor-toolbar__item {
+    margin: 0 2px !important;
+}
+
+.edit-memo-modal .vditor-toolbar__item button {
+    padding: 6px !important;
+    border-radius: 4px !important;
+}
+
+.edit-memo-modal .vditor-toolbar svg {
+    width: 16px !important;
+    height: 16px !important;
+}
+
+/* 隐藏编辑弹窗中的 Vditor 自定义 tooltip（使用原生 title 代替） */
+.edit-memo-modal .vditor-tooltipped::before,
+.edit-memo-modal .vditor-tooltipped::after,
+.edit-memo-modal .vditor-toolbar .vditor-tooltipped::before,
+.edit-memo-modal .vditor-toolbar .vditor-tooltipped::after {
+    display: none !important;
+}
+
+/* 编辑弹窗中的按钮鼠标样式 - 保持普通指针 */
+.edit-memo-modal .vditor-toolbar__item button {
+    cursor: pointer;
+}
+
+/* 文本标记悬浮按钮 */
+.text-mark-btn {
+    position: fixed;
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    z-index: 99999;
+    transition: all 0.2s;
+    animation: markBtnSlideIn 0.2s ease-out;
+}
+
+@keyframes markBtnSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.text-mark-btn:hover {
+    background: var(--primary-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+.text-mark-btn:active {
+    transform: translateY(0);
+}
+
+.text-mark-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.edit-memo-modal .vditor-content,
+.edit-memo-modal .vditor-ir,
+.edit-memo-modal .vditor-wysiwyg,
+.edit-memo-modal .vditor-sv {
+    background: white !important;
+    font-size: 15px !important;
+    line-height: 1.6 !important;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .edit-memo-container {
+        width: 95%;
+        height: 95vh;
+    }
+    
+    .edit-memo-header {
+        padding: 16px 20px;
+    }
+    
+    .edit-memo-header h2 {
+        font-size: 16px;
+    }
+    
+    .edit-memo-info {
+        padding: 8px 20px;
+        font-size: 12px;
+    }
+    
+    .edit-memo-footer {
+        padding: 12px 20px;
+    }
+    
+    .edit-memo-modal .vditor-toolbar {
+        padding: 6px 8px !important;
+    }
+}
+
+/* 暗色模式下的编辑弹窗样式 */
+[data-theme="dark"] .edit-memo-overlay {
+    background: rgba(0, 0, 0, 0.85);
+}
+
+[data-theme="dark"] .edit-memo-container {
+    background: var(--sidebar-bg);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+}
+
+[data-theme="dark"] .edit-memo-header {
+    background: var(--background);
+    border-bottom-color: var(--border-color);
+}
+
+[data-theme="dark"] .edit-memo-header h2 {
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .edit-memo-close {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .edit-memo-close:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+[data-theme="dark"] .edit-memo-info {
+    background: var(--background);
+    border-bottom-color: var(--border-color);
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .edit-memo-body {
+    background: var(--sidebar-bg) !important;
+}
+
+[data-theme="dark"] .edit-memo-footer {
+    background: var(--background);
+    border-top-color: var(--border-color);
+}
+
+[data-theme="dark"] .edit-memo-content {
+    background: var(--sidebar-bg);
+}
+
+/* 暗色模式下的编辑弹窗中的 Vditor */
+[data-theme="dark"] .edit-memo-modal .vditor {
+    background: var(--sidebar-bg) !important;
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor-toolbar {
+    background: var(--background) !important;
+    border-bottom-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor-toolbar__item button {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor-toolbar__item button:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+    color: var(--text-primary);
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor-toolbar svg {
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor-content,
+[data-theme="dark"] .edit-memo-modal .vditor-ir,
+[data-theme="dark"] .edit-memo-modal .vditor-wysiwyg,
+[data-theme="dark"] .edit-memo-modal .vditor-sv {
+    background: var(--sidebar-bg) !important;
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor-ir {
+    background: var(--sidebar-bg) !important;
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor-ir pre.vditor-reset {
+    background: var(--sidebar-bg) !important;
+    color: #e4e4e7 !important;
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor-reset {
+    color: #e4e4e7 !important;
+}
+
+/* 只为非代码元素设置颜色，保留代码高亮 */
+[data-theme="dark"] .edit-memo-modal .vditor-reset > p,
+[data-theme="dark"] .edit-memo-modal .vditor-reset > h1,
+[data-theme="dark"] .edit-memo-modal .vditor-reset > h2,
+[data-theme="dark"] .edit-memo-modal .vditor-reset > h3,
+[data-theme="dark"] .edit-memo-modal .vditor-reset > h4,
+[data-theme="dark"] .edit-memo-modal .vditor-reset > h5,
+[data-theme="dark"] .edit-memo-modal .vditor-reset > h6,
+[data-theme="dark"] .edit-memo-modal .vditor-reset > ul,
+[data-theme="dark"] .edit-memo-modal .vditor-reset > ol,
+[data-theme="dark"] .edit-memo-modal .vditor-reset > blockquote,
+[data-theme="dark"] .edit-memo-modal .vditor-reset > div:not(pre):not([class*="language"]) {
+    color: #e4e4e7 !important;
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor-reset a {
+    color: #7c8df8 !important;
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor-reset blockquote {
+    color: #a1a1aa !important;
+    border-left-color: #7c8df8 !important;
+}
+
+/* 暗色模式下编辑器中的输入文字 */
+[data-theme="dark"] .edit-memo-modal .vditor-ir__marker {
+    color: #e4e4e7 !important;
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor-ir__node {
+    color: #e4e4e7 !important;
+}
+
+/* 暗色模式下编辑器中的标记文本（==标记==） */
+[data-theme="dark"] .edit-memo-modal mark,
+[data-theme="dark"] .edit-memo-modal .vditor-reset mark,
+[data-theme="dark"] .edit-memo-modal .vditor-ir mark {
+    color: #1a1a1a !important;
+    background-color: #ffd700 !important;
+}
+
+/* 暗色模式下发布区编辑器的标记文本 */
+[data-theme="dark"] #vditorPublish mark,
+[data-theme="dark"] #vditorPublish .vditor-reset mark,
+[data-theme="dark"] #vditorPublish .vditor-ir mark {
+    color: #1a1a1a !important;
+    background-color: #ffd700 !important;
+}
+
+/* 暗色模式下文章内容区的标记文本 */
+[data-theme="dark"] .memo-content mark {
+    color: #1a1a1a !important;
+    background-color: #ffd700 !important;
+}
+
+/* 暗色模式下的 Prism.js 代码高亮颜色 */
+[data-theme="dark"] .token.comment,
+[data-theme="dark"] .token.prolog,
+[data-theme="dark"] .token.doctype,
+[data-theme="dark"] .token.cdata {
+    color: #6a9955 !important;
+}
+
+[data-theme="dark"] .token.punctuation {
+    color: #d4d4d8 !important;
+}
+
+[data-theme="dark"] .token.property,
+[data-theme="dark"] .token.tag,
+[data-theme="dark"] .token.boolean,
+[data-theme="dark"] .token.number,
+[data-theme="dark"] .token.constant,
+[data-theme="dark"] .token.symbol,
+[data-theme="dark"] .token.deleted {
+    color: #b5cea8 !important;
+}
+
+[data-theme="dark"] .token.selector,
+[data-theme="dark"] .token.attr-name,
+[data-theme="dark"] .token.string,
+[data-theme="dark"] .token.char,
+[data-theme="dark"] .token.builtin,
+[data-theme="dark"] .token.inserted {
+    color: #ce9178 !important;
+}
+
+[data-theme="dark"] .token.operator,
+[data-theme="dark"] .token.entity,
+[data-theme="dark"] .token.url,
+[data-theme="dark"] .language-css .token.string,
+[data-theme="dark"] .style .token.string {
+    color: #d4d4d8 !important;
+}
+
+[data-theme="dark"] .token.atrule,
+[data-theme="dark"] .token.attr-value,
+[data-theme="dark"] .token.keyword {
+    color: #c586c0 !important;
+}
+
+[data-theme="dark"] .token.function,
+[data-theme="dark"] .token.class-name {
+    color: #dcdcaa !important;
+}
+
+[data-theme="dark"] .token.regex,
+[data-theme="dark"] .token.important,
+[data-theme="dark"] .token.variable {
+    color: #d16969 !important;
+}
+
+/* 确保代码块内的 token 元素保持背景透明但颜色高亮 */
+[data-theme="dark"] .memo-content pre[class*="language-"] .token,
+[data-theme="dark"] .memo-content code[class*="language-"] .token,
+[data-theme="dark"] .edit-memo-modal pre[class*="language-"] .token,
+[data-theme="dark"] .edit-memo-modal code[class*="language-"] .token {
+    background: transparent !important;
+    text-shadow: none !important;
+}
+
+/* 暗色模式下代码块的基础文字颜色 */
+[data-theme="dark"] .memo-content pre[class*="language-"],
+[data-theme="dark"] .memo-content code[class*="language-"] {
+    color: #d4d4d8 !important;
+}
+
+[data-theme="dark"] .edit-memo-modal pre[class*="language-"],
+[data-theme="dark"] .edit-memo-modal code[class*="language-"] {
+    color: #d4d4d8 !important;
+}
+
+/* 暗色模式下的滚动条样式 */
+[data-theme="dark"] .edit-memo-modal ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+[data-theme="dark"] .edit-memo-modal ::-webkit-scrollbar-track {
+    background: var(--background);
+    border-radius: 6px;
+}
+
+[data-theme="dark"] .edit-memo-modal ::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 6px;
+    border: 2px solid var(--background);
+}
+
+[data-theme="dark"] .edit-memo-modal ::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor ::-webkit-scrollbar-track {
+    background: var(--background);
+    border-radius: 6px;
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor ::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 6px;
+    border: 2px solid var(--background);
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor ::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor-ir ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor-ir ::-webkit-scrollbar-track {
+    background: var(--sidebar-bg);
+    border-radius: 6px;
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor-ir ::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 6px;
+    border: 2px solid var(--sidebar-bg);
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor-ir ::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* 暗色模式下的 Vditor resize 控件（编辑弹窗） */
+[data-theme="dark"] .edit-memo-modal .vditor-resize {
+    background: var(--background) !important;
+    border-top: 1px solid var(--border-color) !important;
+    padding: 0px 0 !important;
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor-resize div {
+    background: transparent !important;
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor-resize svg {
+    color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .edit-memo-modal .vditor-resize:hover svg {
+    color: var(--text-primary) !important;
+}
+
+/* 暗色模式下的 Vditor resize 控件（全局） */
+[data-theme="dark"] .vditor-resize {
+    background: var(--background) !important;
+    border-top: 1px solid var(--border-color) !important;
+    padding: 0px 0 !important;
+}
+
+[data-theme="dark"] .vditor-resize div {
+    background: transparent !important;
+}
+
+[data-theme="dark"] .vditor-resize svg {
+    color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .vditor-resize:hover svg {
+    color: var(--text-primary) !important;
+}
+
+/* 旧的 modal-content-large 样式已删除，现在使用独立的 edit-memo-modal 系统 */
+
 /* Vditor 代码块平滑渲染 */
 .vditor code,
 .vditor pre,
@@ -894,6 +1524,53 @@ pre {
     background: transparent !important;
 }
 
+/* 暗色模式下的文章内容文字颜色 */
+[data-theme="dark"] .memo-content {
+    color: #e4e4e7 !important;
+}
+
+[data-theme="dark"] .memo-content p,
+[data-theme="dark"] .memo-content li,
+[data-theme="dark"] .memo-content div {
+    color: #e4e4e7 !important;
+}
+
+[data-theme="dark"] .memo-content h1,
+[data-theme="dark"] .memo-content h2,
+[data-theme="dark"] .memo-content h3,
+[data-theme="dark"] .memo-content h4,
+[data-theme="dark"] .memo-content h5,
+[data-theme="dark"] .memo-content h6 {
+    color: #e4e4e7 !important;
+}
+
+/* 暗色模式下的 Vditor 渲染内容 */
+[data-theme="dark"] .memo-content .vditor-reset {
+    color: #e4e4e7 !important;
+}
+
+/* 只为非代码元素设置颜色，保留代码高亮 */
+[data-theme="dark"] .memo-content .vditor-reset > p,
+[data-theme="dark"] .memo-content .vditor-reset > h1,
+[data-theme="dark"] .memo-content .vditor-reset > h2,
+[data-theme="dark"] .memo-content .vditor-reset > h3,
+[data-theme="dark"] .memo-content .vditor-reset > h4,
+[data-theme="dark"] .memo-content .vditor-reset > h5,
+[data-theme="dark"] .memo-content .vditor-reset > h6,
+[data-theme="dark"] .memo-content .vditor-reset > li,
+[data-theme="dark"] .memo-content .vditor-reset > div:not(pre):not([class*="language"]) {
+    color: #e4e4e7 !important;
+}
+
+[data-theme="dark"] .memo-content .vditor-reset a {
+    color: #7c8df8 !important;
+}
+
+[data-theme="dark"] .memo-content .vditor-reset blockquote {
+    color: #a1a1aa !important;
+    border-left-color: #7c8df8 !important;
+}
+
 [data-theme="dark"] .lightbox {
     background: rgba(0, 0, 0, 0.95);
 }
@@ -1154,6 +1831,33 @@ body {
     overflow-y: auto;
 }
 
+/* 主侧边栏滚动条样式 */
+.sidebar-nav::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+/* 暗色模式下的主侧边栏滚动条 */
+[data-theme="dark"] .sidebar-nav::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+[data-theme="dark"] .sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
 .nav-item {
     display: flex;
     align-items: center;
@@ -1241,6 +1945,39 @@ body {
 
 .filter-sidebar.hidden {
     transform: translateX(-280px);
+}
+
+/* 筛选侧边栏滚动条样式 - 现代化设计（更细更优雅） */
+.filter-sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.filter-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 10px 0;
+}
+
+.filter-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(102, 126, 234, 0.15);
+    border-radius: 10px;
+    transition: all 0.3s ease;
+}
+
+.filter-sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(102, 126, 234, 0.3);
+}
+
+/* 暗色模式下的筛选侧边栏滚动条 */
+[data-theme="dark"] .filter-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(124, 141, 248, 0.2);
+}
+
+[data-theme="dark"] .filter-sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(124, 141, 248, 0.4);
+}
+
+[data-theme="dark"] .filter-sidebar::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 .search-box {
@@ -2108,82 +2845,121 @@ body {
 }
 
 .memo-content pre code {
-    background: none;
+    background: transparent !important;  /* 强制透明，使用 pre 的背景色 */
     padding: 0;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* 代码块复制按钮样式 */
-.code-block-wrapper {
+/* 代码块样式 - 使用 Vditor 自带复制功能 */
+.memo-content pre[class*="language-"] {
     position: relative;
     margin: 12px 0;
+    padding: 16px;
+    border-radius: 8px;
+    background: #f6f8fa !important;  /* 统一背景色 */
+    border: 1px solid var(--border-color);
+    overflow-x: auto;
 }
 
-.code-block-header {
+/* 确保 code 标签背景透明，使用 pre 的背景色 */
+.memo-content pre[class*="language-"] code {
+    background: transparent !important;
+}
+
+/* 确保所有 Prism.js token 背景也透明 */
+.memo-content pre[class*="language-"] .token,
+.memo-content pre[class*="language-"] span[class*="token"],
+.memo-content pre[class*="language-"] code[class*="language-"] {
+    background: transparent !important;
+}
+
+/* 确保行内 code 和代码块 code 背景色不同 */
+.memo-content code:not(pre code) {
+    background: rgba(102, 126, 234, 0.1) !important;  /* 行内代码保持浅紫背景 */
+}
+
+/* 使用 CSS 伪元素显示语言类型 */
+.memo-content pre[class*="language-"]::before {
+    content: attr(class);
     position: absolute;
     top: 8px;
-    right: 8px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    z-index: 10;
-}
-
-.code-language {
-    font-size: 12px;
+    right: 12px;
+    font-size: 11px;
     color: var(--text-muted);
-    background: rgba(255, 255, 255, 0.8);
-    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 3px 8px;
     border-radius: 4px;
     font-family: 'Monaco', 'Courier New', monospace;
     text-transform: uppercase;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    z-index: 1;
+    opacity: 1;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
 }
 
-.code-copy-btn {
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 6px 8px;
-    cursor: pointer;
-    font-size: 12px;
+/* 鼠标悬停时隐藏语言标签，避免与 Vditor 复制按钮重叠 */
+.memo-content pre[class*="language-"]:hover::before {
+    opacity: 0;
+}
+
+/* 提取语言名称 */
+.memo-content pre.language-javascript::before { content: 'JavaScript'; }
+.memo-content pre.language-js::before { content: 'JavaScript'; }
+.memo-content pre.language-typescript::before { content: 'TypeScript'; }
+.memo-content pre.language-ts::before { content: 'TypeScript'; }
+.memo-content pre.language-python::before { content: 'Python'; }
+.memo-content pre.language-py::before { content: 'Python'; }
+.memo-content pre.language-java::before { content: 'Java'; }
+.memo-content pre.language-cpp::before { content: 'C++'; }
+.memo-content pre.language-c::before { content: 'C'; }
+.memo-content pre.language-csharp::before { content: 'C#'; }
+.memo-content pre.language-go::before { content: 'Go'; }
+.memo-content pre.language-rust::before { content: 'Rust'; }
+.memo-content pre.language-php::before { content: 'PHP'; }
+.memo-content pre.language-ruby::before { content: 'Ruby'; }
+.memo-content pre.language-swift::before { content: 'Swift'; }
+.memo-content pre.language-kotlin::before { content: 'Kotlin'; }
+.memo-content pre.language-html::before { content: 'HTML'; }
+.memo-content pre.language-css::before { content: 'CSS'; }
+.memo-content pre.language-scss::before { content: 'SCSS'; }
+.memo-content pre.language-sass::before { content: 'SASS'; }
+.memo-content pre.language-less::before { content: 'Less'; }
+.memo-content pre.language-json::before { content: 'JSON'; }
+.memo-content pre.language-xml::before { content: 'XML'; }
+.memo-content pre.language-yaml::before { content: 'YAML'; }
+.memo-content pre.language-sql::before { content: 'SQL'; }
+.memo-content pre.language-bash::before { content: 'Bash'; }
+.memo-content pre.language-sh::before { content: 'Shell'; }
+.memo-content pre.language-powershell::before { content: 'PowerShell'; }
+.memo-content pre.language-docker::before { content: 'Docker'; }
+.memo-content pre.language-markdown::before { content: 'Markdown'; }
+.memo-content pre.language-md::before { content: 'Markdown'; }
+
+/* 暗色主题下的代码块背景统一 */
+[data-theme="dark"] .memo-content pre[class*="language-"] {
+    background: #18181b !important;  /* 统一暗色背景 */
+}
+
+[data-theme="dark"] .memo-content pre[class*="language-"] code {
+    background: transparent !important;  /* code 背景透明 */
+}
+
+[data-theme="dark"] .memo-content pre[class*="language-"] .token {
+    background: transparent !important;  /* token 背景透明 */
+}
+
+/* 暗色主题下的语言标签 */
+[data-theme="dark"] .memo-content pre[class*="language-"]::before {
+    background: rgba(0, 0, 0, 0.6);
     color: var(--text-secondary);
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-family: inherit;
+    border-color: rgba(255, 255, 255, 0.1);
 }
 
-.code-copy-btn:hover {
-    background: var(--primary-color);
-    color: white;
-    border-color: var(--primary-color);
-    transform: translateY(-1px);
-}
-
-.code-copy-btn:active {
-    transform: translateY(0);
-}
-
-.code-copy-btn svg {
-    width: 14px;
-    height: 14px;
-}
-
-.code-copy-btn.copied {
-    background: #28a745;
-    color: white;
-    border-color: #28a745;
-}
-
-.code-copy-btn.copied svg {
-    display: none;
-}
-
-.code-copy-btn.copied::after {
-    content: "已复制";
-    font-size: 12px;
+/* 暗色主题下鼠标悬停也隐藏 */
+[data-theme="dark"] .memo-content pre[class*="language-"]:hover::before {
+    opacity: 0;
 }
 
 .memo-content blockquote {
@@ -2281,15 +3057,27 @@ body {
 }
 
 /* 隐藏任务列表项的小黑点 */
-.memo-content li:has(> input[type="checkbox"]) {
+.memo-content li:has(> input[type="checkbox"]),
+.memo-content .vditor-task {
     list-style: none;
+    padding-left: 1.6em; /* 保留足够的空间显示复选框（Vditor 复选框使用 -1.6em 左边距） */
+    margin-left: 0;
+}
+
+.memo-content ul:has(> li > input[type="checkbox"]),
+.memo-content ul:has(> li.vditor-task) {
     padding-left: 0;
     margin-left: 0;
 }
 
-.memo-content ul:has(> li > input[type="checkbox"]) {
-    padding-left: 0;
-    margin-left: 0;
+/* 确保 Vditor 任务列表复选框可见 */
+.memo-content .vditor-task input[type="checkbox"] {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    margin: 0 0.2em 0.25em -1.6em;
+    font-size: 12px;
+    vertical-align: middle;
 }
 
 .memo-tags {
@@ -3176,6 +3964,25 @@ body {
 
 .toast.slide-out {
     animation: slideOutRight 0.3s ease-in forwards;
+}
+
+/* 暗色模式下的 Toast 配色 */
+[data-theme="dark"] .toast {
+    background: var(--background) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="dark"] .toast-content {
+    color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .toast-close {
+    color: var(--text-secondary) !important;
+}
+
+[data-theme="dark"] .toast-close:hover {
+    color: var(--text-primary) !important;
 }
 
 .file-upload-btn {

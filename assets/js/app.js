@@ -17,9 +17,7 @@ let publishVditor = null; // 发布区 Vditor 实例
 let mobileVditor = null; // 移动端 Vditor 实例
 let currentTags = []; // 当前输入的标签列表
 let mobileTags = []; // 移动端当前标签列表
-let attachmentViewMode = 'grid'; // 附件视图模式: 'grid' 或 'list'
-let attachmentPage = 1; // 附件当前页码
-let attachmentPerPage = 15; // 附件每页数量
+// 附件管理变量已迁移至 attachments.js
 
 // Toast 消息系统
 function showToast(message, type = 'info', duration = 4000) {
@@ -82,12 +80,11 @@ function closeToast(closeBtn) {
 
 // 初始化应用
 document.addEventListener('DOMContentLoaded', async function() {
-    // 确保marked和Prism都已加载
-    if (typeof marked !== 'undefined' && typeof Prism !== 'undefined') {
-        initMarked();
-        console.log('Marked和Prism.js初始化完成');
+    // 确保Prism已加载（用于代码块复制功能）
+    if (typeof Prism !== 'undefined') {
+        console.log('Prism.js初始化完成');
     } else {
-        console.warn('Marked或Prism.js未正确加载');
+        console.warn('Prism.js未正确加载');
     }
     
     // 优先加载用户偏好设置（确保文章高度限制等设置能正确应用）
@@ -105,17 +102,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         }
     }
     
-    // 恢复附件视图模式
-    const savedViewMode = localStorage.getItem('attachmentViewMode');
-    if (savedViewMode) {
-        attachmentViewMode = savedViewMode;
-    }
-    
-    // 恢复附件每页数量
-    const savedPerPage = localStorage.getItem('attachmentPerPage');
-    if (savedPerPage) {
-        attachmentPerPage = parseInt(savedPerPage);
-    }
+    // 附件视图首选项已在 attachments.js 初始化
     
     // 根据 URL 哈希初始化页面
     const initialView = getViewFromHash();
@@ -229,6 +216,21 @@ async function initPublishVditor() {
             '|',
             'fullscreen'
         ],
+        preview: {
+            math: {
+                engine: 'KaTeX',
+                inlineDigit: true
+            },
+            markdown: {
+                toc: true,
+                mark: true,
+                footnotes: true,
+                autoSpace: true
+            },
+            hljs: {
+                enable: false  // 禁用 highlight.js，使用 Prism.js 代码高亮
+            }
+        },
         upload: {
             url: 'api.php?action=upload',
             fieldName: 'file',
@@ -301,6 +303,18 @@ async function initPublishVditor() {
         },
         ctrlEnter: saveMemo
     });
+    
+    // 启用文本标记功能
+    setTimeout(() => {
+        console.log('准备启用发布区标记功能');
+        console.log('publishVditor:', publishVditor);
+        console.log('publishVditor类型:', typeof publishVditor);
+        if (publishVditor) {
+            console.log('publishVditor.vditor:', publishVditor.vditor);
+            console.log('publishVditor.element:', publishVditor.element);
+        }
+        enableTextMarkFeature(publishVditor);
+    }, 500);  // 增加延迟到500ms
 }
 
 // 获取 Emoji 配置（复用）
@@ -522,44 +536,52 @@ function getEmojiConfig() {
 }
 
 // 配置 Markdown 解析器
-function initMarked() {
-    if (typeof marked !== 'undefined') {
-        marked.setOptions({
-            highlight: function(code, lang) {
-                if (lang && Prism.languages[lang]) {
-                    try {
-                        return Prism.highlight(code, Prism.languages[lang], lang);
-                    } catch (err) {
-                        console.warn('Prism代码高亮失败:', err);
-                    }
+// initMarked 函数已删除 - 现在统一使用 Vditor.preview() 渲染
+
+// 渲染Markdown内容（使用 Vditor.preview 方法，注意是异步的）
+async function renderMarkdownAsync(content, targetElement) {
+    // 优先使用 Vditor 的预览渲染（支持数学公式、Graphviz、Mermaid等）
+    if (typeof Vditor !== 'undefined' && typeof Vditor.preview === 'function') {
+        try {
+            console.log('使用 Vditor.preview 渲染，CDN路径:', './assets/vendor/vditor');
+            
+            await Vditor.preview(targetElement, content, {
+                cdn: './assets/vendor/vditor',
+                math: {
+                    engine: 'KaTeX',
+                    inlineDigit: true
+                },
+                markdown: {
+                    toc: true,
+                    mark: true,
+                    footnotes: true,
+                    autoSpace: true
+                },
+                speech: {
+                    enable: false
+                },
+                hljs: {
+                    enable: false  // 禁用 highlight.js，使用 Prism.js
+                },
+                mode: 'light',
+                after: () => {
+                    console.log('✅ Vditor 渲染完成');
                 }
-                // 如果没有指定语言或语言不支持，使用自动检测
-                try {
-                    return Prism.highlight(code, Prism.languages.auto);
-                } catch (err) {
-                    console.warn('Prism自动代码高亮失败:', err);
-                    return code;
-                }
-            },
-            breaks: true,
-            gfm: true,
-            langPrefix: 'language-'
-        });
+            });
+            
+            return true;
+        } catch (error) {
+            console.error('❌ Vditor渲染失败:', error);
+            return false;
+        }
     }
+    return false;
 }
 
-// 渲染Markdown内容
+// 同步渲染函数（简化版，仅用于备份）
 function renderMarkdown(content) {
-    if (typeof marked !== 'undefined') {
-        try {
-            return marked.parse(content);
-        } catch (error) {
-            console.error('Markdown解析失败:', error);
+    // 如果 Vditor 渲染失败，简单处理
             return content.replace(/\n/g, '<br>');
-        }
-    } else {
-        return content.replace(/\n/g, '<br>');
-    }
 }
 
 // 执行搜索
@@ -724,7 +746,10 @@ function handleViewChange(view, updateUrl = true) {
             }, 300);
             break;
         case 'attachments':
-            loadAttachments();
+            // 动态加载附件 JS/CSS
+            ensureAttachmentsAssetsLoaded().then(() => {
+                if (typeof loadAttachments === 'function') loadAttachments();
+            });
             break;
         case 'stats':
             loadStats();
@@ -736,6 +761,41 @@ function handleViewChange(view, updateUrl = true) {
             loadSettings();
             break;
     }
+}
+
+// 按需加载附件页的 CSS/JS（仅第一次访问时加载）
+function ensureAttachmentsAssetsLoaded() {
+    if (window.__attachmentsAssetsLoaded) {
+        return Promise.resolve();
+    }
+    return new Promise((resolve, reject) => {
+        try {
+            // 加载 CSS（若未加载）
+            const cssHref = 'assets/css/attachments.css';
+            const hasCss = !!document.querySelector(`link[href*="${cssHref}"]`);
+            if (!hasCss) {
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = cssHref;
+                document.head.appendChild(link);
+            }
+            // 如果函数已存在，说明 JS 已加载
+            if (typeof loadAttachments === 'function') {
+                window.__attachmentsAssetsLoaded = true;
+                resolve();
+                return;
+            }
+            // 动态加载 JS
+            const script = document.createElement('script');
+            script.src = 'assets/js/attachments.js';
+            script.async = true;
+            script.onload = () => { window.__attachmentsAssetsLoaded = true; resolve(); };
+            script.onerror = (e) => reject(e);
+            document.body.appendChild(script);
+        } catch (e) {
+            reject(e);
+        }
+    });
 }
 
 // 更新 URL 哈希
@@ -916,6 +976,21 @@ function showMobilePublishModal() {
                     '|',
                     'table'
                 ],
+                preview: {
+                    math: {
+                        engine: 'KaTeX',
+                        inlineDigit: true
+                    },
+                    markdown: {
+                        toc: true,
+                        mark: true,
+                        footnotes: true,
+                        autoSpace: true
+                    },
+                    hljs: {
+                        enable: false  // 禁用 highlight.js，使用 Prism.js
+                    }
+                },
                 upload: {
                     url: 'api.php?action=upload',
                     fieldName: 'file',
@@ -1362,6 +1437,25 @@ async function loadMemos(search = '', append = false) {
 async function enableTodoCheckboxes(card, memo) {
     // 查找所有任务列表项中的复选框
     const checkboxes = card.querySelectorAll('.memo-content input[type="checkbox"]');
+		
+		// 游客模式：禁止交互但不使用 disabled（保持视觉一致）
+		const isGuestMode = !document.getElementById('vditorPublish');
+		if (isGuestMode) {
+			checkboxes.forEach((checkbox) => {
+				if (checkbox.getAttribute('data-guest-blocked') === 'true') return;
+				const blockMouse = (e) => { e.preventDefault(); e.stopPropagation(); };
+				const blockKey = (e) => {
+					if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); }
+				};
+				checkbox.addEventListener('mousedown', blockMouse);
+				checkbox.addEventListener('click', blockMouse);
+				checkbox.addEventListener('touchstart', blockMouse, { passive: false });
+				checkbox.addEventListener('keydown', blockKey);
+				if (!checkbox.title) checkbox.title = '登录后可勾选';
+				checkbox.setAttribute('data-guest-blocked', 'true');
+			});
+			return;
+		}
     
     checkboxes.forEach((checkbox, index) => {
         // 移除 disabled 属性，使复选框可点击
@@ -1428,19 +1522,11 @@ async function enableTodoCheckboxes(card, memo) {
                 const updateResult = await updateResponse.json();
                 
                 if (updateResult.data) {
-                    // 更新成功后，重新渲染内容
+                    // 更新成功后，使用异步 Markdown 渲染，保持与初始渲染一致
                     const contentDiv = card.querySelector('.memo-content');
-                    contentDiv.innerHTML = renderMarkdown(updatedContent);
-                    
-                    // 重新应用代码高亮
-                    if (typeof Prism !== 'undefined') {
-                        const codeBlocks = contentDiv.querySelectorAll('pre code');
-                        codeBlocks.forEach(block => {
-                            Prism.highlightElement(block);
-                        });
-                    }
-                    
-                    // 重新为图片和复选框添加事件
+                    await renderMarkdownAsync(updatedContent, contentDiv);
+
+                    // 渲染后处理：图片预览、代码高亮与复制按钮、复选框事件、内容高度
                     setTimeout(() => {
                         const memoImages = contentDiv.querySelectorAll('img');
                         memoImages.forEach(img => {
@@ -1449,8 +1535,9 @@ async function enableTodoCheckboxes(card, memo) {
                             });
                         });
                         
-                        // 递归调用，为新渲染的复选框添加事件
+                        addCopyButtonsToCodeBlocks(card);
                         enableTodoCheckboxes(card, memo);
+                        applyMemoHeightLimit(card);
                     }, 0);
                     
                     // 非移动端才显示提示（移动端屏幕太小，避免占用空间）
@@ -1574,19 +1661,8 @@ function createMemoCard(memo) {
     // 检查是否为游客模式（通过检查是否存在发布编辑器元素）
     const isGuestMode = !document.getElementById('vditorPublish');
     
-    // 解析 Markdown
-    let contentHtml;
-    if (typeof marked !== 'undefined') {
-        try {
-            contentHtml = marked.parse(memo.content);
-            console.log('Markdown解析成功');
-        } catch (error) {
-            console.error('Markdown解析失败:', error);
-            contentHtml = memo.content.replace(/\n/g, '<br>');
-        }
-    } else {
-        contentHtml = memo.content.replace(/\n/g, '<br>');
-    }
+    // 先使用占位符，稍后异步渲染
+    let contentHtml = '<div class="memo-content-placeholder">正在加载...</div>';
     
     // 构建标签 HTML
     const tagsHtml = memo.tags && memo.tags.length > 0
@@ -1732,11 +1808,40 @@ function createMemoCard(memo) {
             ${actionsHtml}
         </div>
         ${tagsHtml}
-        <div class="memo-content">${contentHtml}</div>
+        <div class="memo-content vditor-reset">${contentHtml}</div>
         ${attachmentsHtml}
     `;
     
-    // 为Markdown渲染的图片添加点击事件
+    // 异步渲染 Markdown 内容（支持高级语法）
+    const contentDiv = card.querySelector('.memo-content');
+    renderMarkdownAsync(memo.content, contentDiv).then(success => {
+        if (!success) {
+            // 如果 Vditor 渲染失败，显示纯文本
+            contentDiv.innerHTML = '<p style="color: var(--text-muted);">内容渲染失败，请刷新页面重试</p>';
+        }
+        
+        // 渲染完成后的处理
+        setTimeout(() => {
+            // 为图片添加点击事件
+            const memoImages = contentDiv.querySelectorAll('img');
+            memoImages.forEach(img => {
+                img.addEventListener('click', function() {
+                    openLightbox(this.src, this.alt);
+                });
+            });
+            
+            // 为代码块添加复制按钮
+            addCopyButtonsToCodeBlocks(card);
+            
+            // 为待办事项的复选框添加点击事件
+            enableTodoCheckboxes(card, memo);
+            
+            // 应用高度限制
+            applyMemoHeightLimit(card);
+        }, 100);
+    });
+    
+    // 为Markdown渲染的图片添加点击事件（备用，兼容同步渲染）
     setTimeout(() => {
         const memoImages = card.querySelectorAll('.memo-content img');
         memoImages.forEach(img => {
@@ -2039,51 +2144,59 @@ async function editMemo(id) {
     }
 }
 
-// 富文本编辑 - 在原地编辑
+// 全局变量存储编辑器实例
+let editVditorInstance = null;
+
+// 打开编辑笔记模态框
 async function editInPlace(id) {
     try {
-        const card = document.querySelector(`.memo-card[data-id="${id}"]`);
-        const contentDiv = card.querySelector('.memo-content');
-        
-        // 检查是否已经在编辑模式
-        if (card.dataset.editing === 'true') {
-            // 如果已经在编辑模式，取消编辑
-            cancelEditInPlace(id);
-            return;
-        }
-        
         const response = await fetch(`api.php?action=memo&id=${id}`);
         const result = await response.json();
         
         if (result.data) {
             const memo = result.data;
             
-            // 保存原始内容到 dataset
-            const originalContent = contentDiv.innerHTML;
-            card.dataset.originalContent = originalContent;
-            card.dataset.editing = 'true';
+            // 设置笔记ID
+            document.getElementById('editMemoId').value = id;
             
-            // 创建编辑容器
-            contentDiv.innerHTML = `
-                <div class="vditor-container" style="margin-bottom: 10px;">
-                    <div id="vditor-${id}"></div>
-                </div>
-                <div class="edit-actions" style="display: flex; gap: 8px; margin-top: 10px;">
-                    <button onclick="saveEditInPlace('${id}')" class="btn-save" style="background: var(--primary-color); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">保存</button>
-                    <button onclick="cancelEditInPlace('${id}')" class="btn-cancel" style="background: var(--border-color); border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">取消</button>
-                </div>
-            `;
+            // 设置编辑时间信息
+            const editTimeInfo = document.getElementById('editMemoTime');
+            if (editTimeInfo) {
+                const createdTime = memo.created_at ? formatTime(memo.created_at) : '未知时间';
+                const updatedTime = memo.updated_at ? formatTime(memo.updated_at) : createdTime;
+                editTimeInfo.textContent = `创建于 ${createdTime}，最后编辑于 ${updatedTime}`;
+            }
             
-            // 初始化 Vditor
+            // 显示模态框（添加 show 类以启用 flex 居中）
+            const modal = document.getElementById('editMemoModal');
+            modal.classList.add('show');
+            
+            // 销毁旧的编辑器实例（如果存在）
+            if (editVditorInstance) {
+                try {
+                    editVditorInstance.destroy();
+                } catch (e) {
+                    console.log('销毁旧编辑器实例时出错:', e);
+                }
+                editVditorInstance = null;
+            }
+            
+            // 清空容器
+            const container = document.getElementById('vditorEdit');
+            container.innerHTML = '';
+            
+            // 延迟初始化，确保模态框已完全显示
+            setTimeout(() => {
             if (typeof Vditor !== 'undefined') {
-                const vditorInstance = new Vditor(`vditor-${id}`, {
-                    height: 400, // 增加高度到400px
-                    mode: 'ir', // 即时渲染模式
+                    editVditorInstance = new Vditor('vditorEdit', {
+                        height: '100%',
+                        width: '100%',
+                        mode: 'ir',
                     value: memo.content,
                     placeholder: '编辑笔记内容... (Ctrl+Enter 保存)',
-                    cdn: './assets/vendor/vditor', // 使用相对路径加载本地资源
-                    lang: 'zh_CN', // 指定中文语言包
-                    ctrlEnter: () => saveEditInPlace(id), // Ctrl+Enter 保存
+                        cdn: './assets/vendor/vditor',
+                        lang: 'zh_CN',
+                        ctrlEnter: () => saveEditedMemo(),
                     hint: {
                         emoji: getEmojiConfig()
                     },
@@ -2115,6 +2228,10 @@ async function editInPlace(id) {
                         'preview',
                         'fullscreen'
                     ],
+                    toolbarConfig: {
+                        hide: false,
+                        pin: false
+                    },
                     upload: {
                         url: 'api.php?action=upload',
                         fieldName: 'file',
@@ -2171,11 +2288,18 @@ async function editInPlace(id) {
                         }
                     },
                     preview: {
+                        math: {
+                            engine: 'KaTeX',
+                            inlineDigit: true
+                        },
                         markdown: {
                             toc: true,
                             mark: true,
                             footnotes: true,
                             autoSpace: true
+                        },
+                        hljs: {
+                            enable: false  // 禁用 highlight.js，使用 Prism.js
                         }
                     },
                     counter: {
@@ -2187,77 +2311,44 @@ async function editInPlace(id) {
                     }
                 });
                 
-                // 将 Vditor 实例存储到 DOM 元素中
-                const vditorElement = document.getElementById(`vditor-${id}`);
-                if (vditorElement) {
-                    vditorElement.vditor = vditorInstance;
-                }
+                    console.log('编辑器初始化完成');
+                    
+                    // 为 toolbar 按钮添加原生 title 提示
+                    setTimeout(() => {
+                        addNativeTitleToToolbar();
+                        // 启用文本标记功能
+                        enableTextMarkFeature(editVditorInstance);
+                    }, 200);
             } else {
-                // 如果 Vditor 未加载，使用普通 textarea
-                const vditorDiv = document.getElementById(`vditor-${id}`);
-                vditorDiv.innerHTML = `<textarea id="vditor-textarea-${id}" style="width: 100%; height: 400px; border: 1px solid var(--border-color); border-radius: 4px; padding: 8px; resize: vertical;" placeholder="编辑笔记内容... (Ctrl+Enter 保存)">${memo.content}</textarea>`;
-                
-                // 为 textarea 添加 Ctrl+Enter 快捷键
-                const textarea = document.getElementById(`vditor-textarea-${id}`);
-                if (textarea) {
-                    textarea.addEventListener('keydown', function(e) {
-                        if (e.ctrlKey && e.key === 'Enter') {
-                            e.preventDefault();
-                            saveEditInPlace(id);
-                        }
-                    });
+                    console.warn('Vditor 未加载');
+                    showToast('编辑器加载失败', 'error');
                 }
-            }
+            }, 100);
         }
     } catch (error) {
-        console.error('富文本编辑失败:', error);
+        console.error('打开编辑框失败:', error);
+        showToast('打开编辑框失败: ' + error.message, 'error');
     }
 }
 
-// 保存富文本编辑
-async function saveEditInPlace(id) {
+// 保存编辑的笔记
+async function saveEditedMemo() {
     try {
-        const card = document.querySelector(`.memo-card[data-id="${id}"]`);
-        let content = '';
+        const id = document.getElementById('editMemoId').value;
         
-        // 获取编辑后的内容
-        if (typeof Vditor !== 'undefined') {
-            const vditorElement = document.querySelector(`#vditor-${id}`);
-            if (vditorElement && vditorElement.vditor) {
-                content = vditorElement.vditor.getValue();
-                console.log('Vditor content retrieved via getValue():', content);
-            } else {
-                console.log('Vditor element not found or vditor not initialized');
-                // 尝试从 Vditor 的内容区域获取文本
-                const vditorContent = document.querySelector(`#vditor-${id} .vditor-ir`) || 
-                                    document.querySelector(`#vditor-${id} .vditor-reset`) ||
-                                    document.querySelector(`#vditor-${id} .vditor-content`);
-                if (vditorContent) {
-                    content = vditorContent.innerText || vditorContent.textContent || '';
-                    console.log('Fallback Vditor content from content area:', content);
-                } else {
-                    console.log('No Vditor content area found');
-                }
-            }
-        } else {
-            const textarea = document.getElementById(`vditor-textarea-${id}`);
-            if (textarea) {
-                content = textarea.value;
-                console.log('Textarea content retrieved:', content);
-            } else {
-                console.log('Textarea element not found');
-            }
-        }
-        
-        console.log('Content before trim:', content);
-        console.log('Content after trim:', content.trim());
-        
-        if (!content.trim()) {
-            showToast('请输入笔记内容', 'warning');
+        if (!editVditorInstance) {
+            showToast('编辑器未初始化', 'error');
             return;
         }
         
-        // 更新笔记
+        const content = editVditorInstance.getValue();
+        
+        if (!content.trim()) {
+            showToast('笔记内容不能为空', 'warning');
+            return;
+        }
+        
+        // 发送更新请求
         const response = await fetch(`api.php?action=memo&id=${id}`, {
             method: 'PUT',
             headers: {
@@ -2271,19 +2362,19 @@ async function saveEditInPlace(id) {
         const result = await response.json();
         
         if (result.data) {
-            // 重新渲染内容
+            // 更新成功，关闭模态框
+            hideEditMemoModal();
+            
+            // 找到对应的卡片并更新内容
+            const card = document.querySelector(`.memo-card[data-id="${id}"]`);
+            if (card) {
             const contentDiv = card.querySelector('.memo-content');
-            contentDiv.innerHTML = renderMarkdown(content);
-            
-            // 重新应用代码高亮
-            if (typeof Prism !== 'undefined') {
-                const codeBlocks = contentDiv.querySelectorAll('pre code');
-                codeBlocks.forEach(block => {
-                    Prism.highlightElement(block);
-                });
-            }
-            
-            // 重新添加图片点击事件
+                
+                // 异步渲染更新后的内容
+                await renderMarkdownAsync(content, contentDiv);
+                
+                // 重新应用事件监听
+                setTimeout(() => {
             const memoImages = contentDiv.querySelectorAll('img');
             memoImages.forEach(img => {
                 img.addEventListener('click', function() {
@@ -2291,35 +2382,301 @@ async function saveEditInPlace(id) {
                 });
             });
             
-            // 重新添加代码块复制按钮
             addCopyButtonsToCodeBlocks(card);
-
-            // 重新为待办事项的复选框添加点击事件（保存后可直接勾选更新）
             enableTodoCheckboxes(card, { id });
+                    applyMemoHeightLimit(card);
+                }, 100);
+            }
             
-            // 清理存储的原始内容和编辑状态
-            delete card.dataset.originalContent;
-            delete card.dataset.editing;
+            showToast('笔记已更新', 'success');
+        } else {
+            showToast(result.msg || '更新失败', 'error');
         }
     } catch (error) {
-        console.error('保存编辑失败:', error);
-        showToast('保存失败，请重试', 'error');
+        console.error('保存笔记失败:', error);
+        showToast('保存失败: ' + error.message, 'error');
     }
 }
 
-// 取消富文本编辑
-function cancelEditInPlace(id) {
-    const card = document.querySelector(`.memo-card[data-id="${id}"]`);
-    const contentDiv = card.querySelector('.memo-content');
-    const originalContent = card.dataset.originalContent;
-    contentDiv.innerHTML = originalContent;
+// 隐藏编辑笔记模态框
+function hideEditMemoModal() {
+    const modal = document.getElementById('editMemoModal');
+    modal.classList.remove('show');
     
-    // 恢复原内容后，确保待办复选框可点击并可更新状态
-    enableTodoCheckboxes(card, { id });
+    // 销毁编辑器实例
+    if (editVditorInstance) {
+        try {
+            editVditorInstance.destroy();
+        } catch (e) {
+            console.log('销毁编辑器实例时出错:', e);
+        }
+        editVditorInstance = null;
+    }
+    
+    // 清空容器
+    document.getElementById('vditorEdit').innerHTML = '';
+    document.getElementById('editMemoId').value = '';
+}
 
-    // 清理存储的原始内容和编辑状态
-    delete card.dataset.originalContent;
-    delete card.dataset.editing;
+// 初始化编辑模态框事件监听
+document.addEventListener('DOMContentLoaded', function() {
+    // ESC键关闭编辑弹窗
+    document.addEventListener('keydown', function(e) {
+        const editModal = document.getElementById('editMemoModal');
+        if (e.key === 'Escape' && editModal && editModal.classList.contains('show')) {
+            hideEditMemoModal();
+        }
+    });
+});
+
+// 为编辑弹窗的 toolbar 添加原生 title 提示
+function addNativeTitleToToolbar() {
+    const modal = document.getElementById('editMemoModal');
+    if (!modal || !modal.classList.contains('show')) {
+        return;
+    }
+    
+    // 按钮名称到中文提示的映射
+    const tooltips = {
+        'emoji': 'Emoji 表情',
+        'headings': '标题',
+        'bold': '粗体 (Ctrl+B)',
+        'italic': '斜体 (Ctrl+I)',
+        'strike': '删除线 (Ctrl+D)',
+        'link': '链接 (Ctrl+K)',
+        'list': '无序列表 (Ctrl+L)',
+        'ordered-list': '有序列表 (Ctrl+O)',
+        'check': '待办列表 (Ctrl+J)',
+        'upload': '上传',
+        'quote': '引用',
+        'line': '分隔线',
+        'code': '代码块 (Ctrl+U)',
+        'inline-code': '行内代码 (Ctrl+G)',
+        'table': '表格 (Ctrl+M)',
+        'undo': '撤销 (Ctrl+Z)',
+        'redo': '重做 (Ctrl+Y)',
+        'edit-mode': '编辑模式',
+        'both': '分屏预览 (Ctrl+P)',
+        'preview': '预览模式',
+        'fullscreen': '全屏'
+    };
+    
+    // 查找所有 toolbar 按钮
+    const toolbarItems = modal.querySelectorAll('.vditor-toolbar__item button');
+    
+    toolbarItems.forEach(button => {
+        // 获取按钮的 data-type 属性
+        const dataType = button.getAttribute('data-type');
+        
+        if (dataType && tooltips[dataType]) {
+            button.setAttribute('title', tooltips[dataType]);
+        }
+    });
+    
+    console.log('已为编辑弹窗 toolbar 添加原生 title 提示');
+}
+
+// 兼容旧代码（保留旧函数名）
+async function saveEditInPlace(id) {
+    await saveEditedMemo();
+}
+
+function cancelEditInPlace(id) {
+    hideEditMemoModal();
+}
+
+// 启用文本标记功能
+function enableTextMarkFeature(vditorInstance) {
+    if (!vditorInstance) {
+        console.warn('标记功能：Vditor实例不存在');
+        return;
+    }
+    
+    const markBtn = document.getElementById('textMarkBtn');
+    if (!markBtn) {
+        console.warn('标记功能：标记按钮不存在');
+        return;
+    }
+    
+    // 获取编辑器元素（支持不同的编辑器实例结构）
+    let contentElement = null;
+    
+    // 方式1：Vditor 实例有 vditor 属性（如编辑弹窗）
+    if (vditorInstance.vditor && vditorInstance.vditor.element) {
+        const editorElement = vditorInstance.vditor.element;
+        contentElement = editorElement.querySelector('.vditor-ir') || 
+                        editorElement.querySelector('.vditor-wysiwyg') || 
+                        editorElement.querySelector('.vditor-sv');
+    }
+    // 方式2：Vditor 实例直接有 element 属性（如发布区）
+    else if (vditorInstance.element) {
+        contentElement = vditorInstance.element.querySelector('.vditor-ir') || 
+                        vditorInstance.element.querySelector('.vditor-wysiwyg') || 
+                        vditorInstance.element.querySelector('.vditor-sv');
+    }
+    // 方式3：通过ID直接查找（备用方案）
+    else {
+        const publishElement = document.querySelector('#vditorPublish .vditor-ir') ||
+                              document.querySelector('#vditorPublish .vditor-wysiwyg') ||
+                              document.querySelector('#vditorPublish .vditor-sv') ||
+                              document.querySelector('#vditorEdit .vditor-ir') ||
+                              document.querySelector('#vditorEdit .vditor-wysiwyg') ||
+                              document.querySelector('#vditorEdit .vditor-sv');
+        contentElement = publishElement;
+    }
+    
+    if (!contentElement) {
+        console.warn('标记功能：无法找到编辑器内容元素');
+        return;
+    }
+    
+    console.log('✅ 标记功能已启用');
+    
+    let selectionTimeout = null;
+    let lastMouseX = 0;
+    let lastMouseY = 0;
+    
+    // 记录鼠标位置
+    const trackMousePosition = (e) => {
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+    };
+    
+    // 监听选中事件
+    const handleSelection = (e) => {
+        clearTimeout(selectionTimeout);
+        
+        // 如果是鼠标事件，记录位置
+        if (e && e.type === 'mouseup') {
+            trackMousePosition(e);
+        }
+        
+        selectionTimeout = setTimeout(() => {
+            const selection = window.getSelection();
+            const selectedText = selection.toString().trim();
+            
+            // 检查是否有选中文字且在编辑器内
+            if (selectedText && contentElement.contains(selection.anchorNode)) {
+                const range = selection.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
+                
+                // 检查是否已标记
+                const isMarked = selectedText.includes('==');
+                
+                // 更新按钮文字
+                if (isMarked) {
+                    markBtn.innerHTML = `
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"></path>
+                        </svg>
+                        取消标记
+                    `;
+                } else {
+                    markBtn.innerHTML = `
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 20h9"></path>
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                        </svg>
+                        标记
+                    `;
+                }
+                
+                // 定位按钮到鼠标松开位置附近
+                // 如果有鼠标位置（鼠标选中），使用鼠标位置
+                // 否则使用选中区域的结束位置（键盘选中）
+                let buttonX, buttonY;
+                
+                if (lastMouseX > 0 && lastMouseY > 0 && e && e.type === 'mouseup') {
+                    // 使用鼠标松开的位置
+                    buttonX = lastMouseX;
+                    buttonY = lastMouseY;
+                } else {
+                    // 使用选中区域的右侧位置（键盘选中或双击）
+                    buttonX = rect.right;
+                    buttonY = rect.top;
+                }
+                
+                // 定位按钮（在鼠标位置的左上方，避免遮挡文字）
+                markBtn.style.left = (buttonX - 35) + 'px';  // 向左偏移35px（按钮宽度的一半）
+                markBtn.style.top = (buttonY - 50 + window.scrollY) + 'px';  // 向上偏移50px
+                markBtn.style.display = 'flex';
+                
+                // 点击标记按钮
+                markBtn.onclick = () => {
+                    markSelectedText(vditorInstance, selectedText);
+                    markBtn.style.display = 'none';
+                };
+            } else {
+                markBtn.style.display = 'none';
+            }
+        }, 100);
+    };
+    
+    // 监听鼠标松开和选中变化
+    contentElement.addEventListener('mouseup', handleSelection);
+    contentElement.addEventListener('keyup', handleSelection);
+    
+    // 监听鼠标移动以跟踪位置
+    contentElement.addEventListener('mousemove', trackMousePosition);
+    
+    // 点击其他地方隐藏按钮
+    document.addEventListener('click', (e) => {
+        if (!markBtn.contains(e.target) && !contentElement.contains(e.target)) {
+            markBtn.style.display = 'none';
+        }
+    });
+}
+
+// 标记选中的文字
+function markSelectedText(vditorInstance, selectedText) {
+    if (!vditorInstance || !selectedText) return;
+    
+    // 检查是否已经标记（检测 == 标记）
+    const isMarked = selectedText.includes('==');
+    
+    let processedText;
+    
+    if (isMarked) {
+        // 取消标记：移除所有 ==
+        const lines = selectedText.split('\n');
+        const unmarkedLines = lines.map(line => {
+            // 移除行首和行尾的 ==
+            return line.replace(/^==/, '').replace(/==$/, '');
+        });
+        processedText = unmarkedLines.join('\n');
+        console.log('已取消标记:', selectedText);
+    } else {
+        // 添加标记：每行都用 == 包裹
+        const lines = selectedText.split('\n');
+        const markedLines = lines.map(line => {
+            if (line.trim()) {
+                return `==${line}==`;
+            }
+            return line;
+        });
+        processedText = markedLines.join('\n');
+        console.log('已添加标记:', selectedText);
+    }
+    
+    // 获取当前选中
+    const selection = window.getSelection();
+    if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        
+        // 删除选中内容
+        range.deleteContents();
+        
+        // 插入处理后的文本
+        const textNode = document.createTextNode(processedText);
+        range.insertNode(textNode);
+        
+        // 触发 Vditor 更新
+        const event = new Event('input', { bubbles: true });
+        range.startContainer.parentElement.dispatchEvent(event);
+        
+        // 清除选中
+        selection.removeAllRanges();
+    }
 }
 
 // 加载标签列表
@@ -2967,445 +3324,29 @@ function setupCalendarClickOutside() {
     });
 }
 
-// 获取附件搜索区域HTML
-function getAttachmentSearchHtml(searchTerm = '', fileType = 'all') {
-    return `
-        <div class="attachment-search-container">
-            <select id="attachmentTypeFilter" class="attachment-type-filter" onchange="searchAttachments()">
-                <option value="all" ${fileType === 'all' ? 'selected' : ''}>全部</option>
-                <option value="image" ${fileType === 'image' ? 'selected' : ''}>图片</option>
-                <option value="text" ${fileType === 'text' ? 'selected' : ''}>文本</option>
-                <option value="document" ${fileType === 'document' ? 'selected' : ''}>文档</option>
-                <option value="archive" ${fileType === 'archive' ? 'selected' : ''}>压缩包</option>
-                <option value="other" ${fileType === 'other' ? 'selected' : ''}>其它</option>
-            </select>
-            <div class="attachment-search-box">
-                <input type="text" id="attachmentSearchInput" placeholder="搜索附件名..." value="${searchTerm}">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" onclick="searchAttachments()">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <path d="m21 21-4.3-4.3"></path>
-                </svg>
-            </div>
-            <div class="attachment-view-toggle">
-                <button class="view-toggle-btn ${attachmentViewMode === 'grid' ? 'active' : ''}" onclick="switchAttachmentView('grid')" title="平铺模式">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="7" height="7"></rect>
-                        <rect x="14" y="3" width="7" height="7"></rect>
-                        <rect x="14" y="14" width="7" height="7"></rect>
-                        <rect x="3" y="14" width="7" height="7"></rect>
-                    </svg>
-                </button>
-                <button class="view-toggle-btn ${attachmentViewMode === 'list' ? 'active' : ''}" onclick="switchAttachmentView('list')" title="列表模式">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="8" y1="6" x2="21" y2="6"></line>
-                        <line x1="8" y1="12" x2="21" y2="12"></line>
-                        <line x1="8" y1="18" x2="21" y2="18"></line>
-                        <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                        <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                        <line x1="3" y1="18" x2="3.01" y2="18"></line>
-                    </svg>
-                </button>
-            </div>
-            <button class="view-toggle-btn" onclick="cleanUnusedImages()" title="清理未引用的图片" style="margin-left: 8px;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="3 6 5 6 21 6"></polyline>
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    <line x1="10" y1="11" x2="10" y2="17"></line>
-                    <line x1="14" y1="11" x2="14" y2="17"></line>
-                </svg>
-            </button>
-        </div>
-    `;
-}
+// 已迁移至 assets/js/attachments.js
 
-// 加载附件列表
-async function loadAttachments(searchTerm = '', fileType = 'all', page = 1) {
-    const memoList = document.getElementById('memoList');
-    const loadMore = document.querySelector('.load-more');
-    const memoEditor = document.querySelector('.memo-editor');
-    
-    attachmentPage = page;
-    
-    // 隐藏加载更多按钮和编辑器
-    if (loadMore) {
-        loadMore.style.display = 'none';
-    }
-    if (memoEditor) {
-        memoEditor.style.display = 'none';
-    }
-    
-    // 添加附件搜索框
-    memoList.innerHTML = getAttachmentSearchHtml(searchTerm, fileType) + '<div class="loading"><div class="spinner"></div></div>';
-    
-    try {
-        const params = new URLSearchParams({
-            page: page,
-            limit: attachmentPerPage
-        });
-        if (searchTerm) params.append('search', searchTerm);
-        
-        const url = `api.php?action=attachments&${params.toString()}`;
-        const response = await fetch(url);
-        const result = await response.json();
-        
-        if (result.data && result.data.length > 0) {
-            // 根据文件类型筛选（注意：筛选后total可能不准确，但这是客户端筛选的权衡）
-            let filteredData = result.data;
-            let actualTotal = result.total || result.data.length;
-            
-            if (fileType !== 'all') {
-                filteredData = result.data.filter(att => matchFileType(att.original_name, att.file_type, fileType));
-                // 如果进行了客户端筛选，total可能不准确，使用当前筛选后的数量
-                if (filteredData.length < result.data.length) {
-                    actualTotal = filteredData.length;
-                }
-            }
-            
-            let html = '';
-            
-            // 根据视图模式生成不同的HTML
-            if (attachmentViewMode === 'list') {
-                // 列表模式
-                html = '<div class="attachment-list">';
-                filteredData.forEach(att => {
-                    const isImage = att.file_type && att.file_type.startsWith('image/');
-                    html += `
-                        <div class="attachment-list-item">
-                            <div class="attachment-list-icon">
-                                ${isImage ? `<img src="${att.url}" alt="${att.original_name}" class="attachment-list-thumbnail">` : `
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M13.234 20.252 21 12.3"></path>
-                                    <path d="m16 6-8.414 8.586a2 2 0 0 0 0 2.828 2 2 0 0 0 2.828 0l8.414-8.586a4 4 0 0 0 0-5.656 4 4 0 0 0-5.656 0l-8.415 8.585a6 6 0 1 0 8.486 8.486"></path>
-                                </svg>
-                                `}
-                            </div>
-                            <div class="attachment-list-info" onclick="${isImage ? `previewAttachmentImage('${att.url}', '${att.original_name.replace(/'/g, "\\'")}'  )` : `window.location.href='${att.url}'`}" style="cursor: pointer;">
-                                <div class="attachment-list-name">${att.original_name}</div>
-                                <div class="attachment-list-meta">${formatFileSize(att.file_size || 0)}</div>
-                            </div>
-                            <div class="attachment-list-actions">
-                                ${isImage ? `
-                                <button class="attachment-list-btn" onclick="previewAttachmentImage('${att.url}', '${att.original_name.replace(/'/g, "\\'")}')" title="预览">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                                        <circle cx="12" cy="12" r="3"></circle>
-                                    </svg>
-                                </button>
-                                ` : ''}
-                                <button class="attachment-list-btn danger" onclick="deleteAttachment(${att.id}, '${att.original_name.replace(/'/g, "\\'")}');" title="删除">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="3 6 5 6 21 6"></polyline>
-                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                });
-                html += '</div>';
-            } else {
-                // 平铺模式（原有的grid布局）
-                html = '<div class="attachment-grid">';
-                
-                filteredData.forEach(att => {
-                    if (att.file_type && att.file_type.startsWith('image/')) {
-                        html += `
-                            <div class="attachment-item-image" style="position: relative;">
-                                <button class="attachment-delete-btn" onclick="event.stopPropagation(); deleteAttachment(${att.id}, '${att.original_name.replace(/'/g, "\\'")}');" title="删除附件">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="3 6 5 6 21 6"></polyline>
-                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                    </svg>
-                                </button>
-                                <div onclick="window.open('${att.url}', '_blank')" style="cursor: pointer;">
-                                    <img src="${att.url}" alt="${att.original_name}" class="attachment-thumbnail">
-                                    <div class="attachment-name">${att.original_name}</div>
-                                </div>
-                            </div>
-                        `;
-                    } else {
-                        html += `
-                            <div class="attachment-item-file" style="position: relative;">
-                                <button class="attachment-delete-btn" onclick="event.stopPropagation(); deleteAttachment(${att.id}, '${att.original_name.replace(/'/g, "\\'")}');" title="删除附件">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="3 6 5 6 21 6"></polyline>
-                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                    </svg>
-                                </button>
-                                <div onclick="window.location.href='${att.url}'" style="cursor: pointer;">
-                                    <div class="attachment-icon">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M13.234 20.252 21 12.3"></path>
-                                            <path d="m16 6-8.414 8.586a2 2 0 0 0 0 2.828 2 2 0 0 0 2.828 0l8.414-8.586a4 4 0 0 0 0-5.656 4 4 0 0 0-5.656 0l-8.415 8.585a6 6 0 1 0 8.486 8.486"></path>
-                                        </svg>
-                                    </div>
-                                    <div class="attachment-name">${att.original_name}</div>
-                                </div>
-                            </div>
-                        `;
-                    }
-                });
-                
-                html += '</div>';
-            }
-            
-            if (filteredData.length === 0) {
-                memoList.innerHTML = getAttachmentSearchHtml(searchTerm, fileType) + '<div class="empty-state"><p>没有找到匹配的附件</p></div>';
-            } else {
-                // 添加分页控件
-                const totalPages = Math.ceil(actualTotal / attachmentPerPage);
-                const paginationHtml = generateAttachmentPagination(page, totalPages, actualTotal, filteredData.length);
-                
-                memoList.innerHTML = getAttachmentSearchHtml(searchTerm, fileType) + html + paginationHtml;
-            }
-            
-            // 设置搜索框事件监听
-            setupAttachmentSearchEvents();
-        } else {
-            memoList.innerHTML = getAttachmentSearchHtml(searchTerm, fileType) + `<div class="empty-state"><p>${searchTerm ? '没有找到匹配的附件' : '还没有附件'}</p></div>`;
-            
-            // 设置搜索框事件监听
-            setupAttachmentSearchEvents();
-        }
-    } catch (error) {
-        console.error('加载附件失败:', error);
-        memoList.innerHTML = getAttachmentSearchHtml(searchTerm, fileType) + '<div class="empty-state"><p>加载失败</p></div>';
-        
-        // 设置搜索框事件监听
-        setupAttachmentSearchEvents();
-    }
-}
+// 已迁移至 assets/js/attachments.js
 
-// 匹配文件类型
-function matchFileType(filename, mimeType, category) {
-    const ext = filename.toLowerCase().split('.').pop();
-    
-    const categories = {
-        image: {
-            mimes: ['image/'],
-            exts: ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'ico', 'tiff', 'tif']
-        },
-        text: {
-            mimes: ['text/'],
-            exts: ['txt', 'md', 'markdown', 'json', 'xml', 'html', 'htm', 'css', 'js', 'ts', 'jsx', 'tsx', 'vue', 'py', 'java', 'c', 'cpp', 'h', 'hpp', 'go', 'rs', 'php', 'rb', 'sh', 'bat', 'cmd', 'ps1', 'sql', 'yaml', 'yml', 'toml', 'ini', 'conf', 'log']
-        },
-        document: {
-            mimes: ['application/pdf', 'application/msword', 'application/vnd.ms-', 'application/vnd.openxmlformats-officedocument'],
-            exts: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'odp', 'rtf', 'tex', 'epub', 'mobi']
-        },
-        archive: {
-            mimes: ['application/zip', 'application/x-zip', 'application/x-rar', 'application/x-7z', 'application/x-tar', 'application/gzip'],
-            exts: ['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'tgz', 'tbz2', 'txz', 'iso', 'dmg']
-        }
-    };
-    
-    const cat = categories[category];
-    if (!cat) return false;
-    
-    // 检查MIME类型
-    if (mimeType) {
-        for (const mime of cat.mimes) {
-            if (mimeType.toLowerCase().includes(mime.toLowerCase())) {
-                return true;
-            }
-        }
-    }
-    
-    // 检查扩展名
-    return cat.exts.includes(ext);
-}
+// 已迁移至 assets/js/attachments.js
 
-// 生成附件分页控件
-function generateAttachmentPagination(currentPage, totalPages, totalCount, currentCount) {
-    if (totalPages <= 1) return '';
-    
-    let html = '<div class="attachment-pagination">';
-    
-    // 分页信息
-    html += `<div class="pagination-info">显示 ${currentCount} / ${totalCount} 个附件</div>`;
-    
-    // 分页按钮
-    html += '<div class="pagination-controls">';
-    
-    // 每页数量选择
-    html += `
-        <select class="per-page-select" onchange="changeAttachmentPerPage(this.value)">
-            <option value="15" ${attachmentPerPage === 15 ? 'selected' : ''}>15条/页</option>
-            <option value="30" ${attachmentPerPage === 30 ? 'selected' : ''}>30条/页</option>
-            <option value="45" ${attachmentPerPage === 45 ? 'selected' : ''}>45条/页</option>
-            <option value="60" ${attachmentPerPage === 60 ? 'selected' : ''}>60条/页</option>
-            <option value="90" ${attachmentPerPage === 90 ? 'selected' : ''}>90条/页</option>
-        </select>
-    `;
-    
-    // 上一页按钮
-    html += `
-        <button class="pagination-btn" onclick="loadAttachmentPage(${currentPage - 1})" ${currentPage <= 1 ? 'disabled' : ''}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="15 18 9 12 15 6"></polyline>
-            </svg>
-        </button>
-    `;
-    
-    // 页码显示
-    html += `<span class="page-number">第 ${currentPage} / ${totalPages} 页</span>`;
-    
-    // 下一页按钮
-    html += `
-        <button class="pagination-btn" onclick="loadAttachmentPage(${currentPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="9 18 15 12 9 6"></polyline>
-            </svg>
-        </button>
-    `;
-    
-    html += '</div>';
-    html += '</div>';
-    
-    return html;
-}
+// 已迁移至 assets/js/attachments.js
 
-// 加载指定页的附件
-function loadAttachmentPage(page) {
-    const searchInput = document.getElementById('attachmentSearchInput');
-    const typeFilter = document.getElementById('attachmentTypeFilter');
-    const searchTerm = searchInput ? searchInput.value.trim() : '';
-    const fileType = typeFilter ? typeFilter.value : 'all';
-    loadAttachments(searchTerm, fileType, page);
-}
+// 已迁移至 assets/js/attachments.js
 
-// 改变每页显示数量
-function changeAttachmentPerPage(perPage) {
-    attachmentPerPage = parseInt(perPage);
-    localStorage.setItem('attachmentPerPage', attachmentPerPage);
-    
-    // 重新加载第一页
-    const searchInput = document.getElementById('attachmentSearchInput');
-    const typeFilter = document.getElementById('attachmentTypeFilter');
-    const searchTerm = searchInput ? searchInput.value.trim() : '';
-    const fileType = typeFilter ? typeFilter.value : 'all';
-    loadAttachments(searchTerm, fileType, 1);
-}
+// 已迁移至 assets/js/attachments.js
 
-// 切换附件视图模式
-function switchAttachmentView(mode) {
-    attachmentViewMode = mode;
-    localStorage.setItem('attachmentViewMode', mode);
-    
-    // 重新加载附件列表
-    const searchInput = document.getElementById('attachmentSearchInput');
-    const typeFilter = document.getElementById('attachmentTypeFilter');
-    const searchTerm = searchInput ? searchInput.value.trim() : '';
-    const fileType = typeFilter ? typeFilter.value : 'all';
-    loadAttachments(searchTerm, fileType, attachmentPage);
-}
+// 已迁移至 assets/js/attachments.js
 
-// 格式化文件大小
-function formatFileSize(bytes) {
-    if (!bytes || bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-}
+// 已迁移至 assets/js/attachments.js
 
-// 预览附件图片
-function previewAttachmentImage(url, name) {
-    const lightbox = document.getElementById('lightbox');
-    const lightboxImage = document.getElementById('lightboxImage');
-    const lightboxPrev = document.getElementById('lightboxPrev');
-    const lightboxNext = document.getElementById('lightboxNext');
-    const lightboxCounter = document.getElementById('lightboxCounter');
-    
-    if (lightbox && lightboxImage) {
-        lightboxImage.src = url;
-        lightboxImage.alt = name;
-        lightbox.classList.add('active');
-        document.body.style.overflow = 'hidden';
-        
-        // 隐藏左右切换按钮和计数器（附件预览只预览单张）
-        if (lightboxPrev) lightboxPrev.style.display = 'none';
-        if (lightboxNext) lightboxNext.style.display = 'none';
-        if (lightboxCounter) lightboxCounter.style.display = 'none';
-    }
-}
+// 已迁移至 assets/js/attachments.js
 
-// 搜索附件
-function searchAttachments() {
-    const searchInput = document.getElementById('attachmentSearchInput');
-    const typeFilter = document.getElementById('attachmentTypeFilter');
-    if (searchInput && typeFilter) {
-        const searchTerm = searchInput.value.trim();
-        const fileType = typeFilter.value;
-        loadAttachments(searchTerm, fileType, 1); // 搜索时重置到第一页
-    }
-}
+// 已迁移至 assets/js/attachments.js
 
-// 设置附件搜索框事件监听
-function setupAttachmentSearchEvents() {
-    const searchInput = document.getElementById('attachmentSearchInput');
-    if (searchInput) {
-        // 添加键盘事件监听
-        searchInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                searchAttachments();
-            }
-        });
-    }
-}
+// 已迁移至 assets/js/attachments.js
 
-// 删除附件
-async function deleteAttachment(attachmentId, attachmentName) {
-    try {
-        // 先检查附件是否被引用
-        const checkResponse = await fetch(`api.php?action=attachments&check_reference=1&id=${attachmentId}`);
-        const checkResult = await checkResponse.json();
-        
-        if (!checkResult.success) {
-            showToast('检查附件引用失败', 'error');
-            return;
-        }
-        
-        let confirmMessage = '';
-        if (checkResult.is_referenced) {
-            // 附件被引用
-            confirmMessage = `附件"${attachmentName}"被 ${checkResult.reference_count} 篇文章引用。\n\n删除后，这些文章中的附件链接将失效。\n\n确定要删除吗？`;
-        } else {
-            // 附件未被引用
-            confirmMessage = `确定要删除附件"${attachmentName}"吗？`;
-        }
-        
-        if (!confirm(confirmMessage)) {
-            return;
-        }
-        
-        // 执行删除
-        const deleteResponse = await fetch('api.php?action=attachments', {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ id: attachmentId })
-        });
-        
-        const deleteResult = await deleteResponse.json();
-        
-        if (deleteResult.success) {
-            showToast('附件删除成功', 'success');
-            // 重新加载附件列表（保持当前页）
-            const searchInput = document.getElementById('attachmentSearchInput');
-            const typeFilter = document.getElementById('attachmentTypeFilter');
-            const searchTerm = searchInput ? searchInput.value.trim() : '';
-            const fileType = typeFilter ? typeFilter.value : 'all';
-            loadAttachments(searchTerm, fileType, attachmentPage);
-        } else {
-            showToast('删除失败: ' + (deleteResult.error || '未知错误'), 'error');
-        }
-    } catch (error) {
-        console.error('删除附件失败:', error);
-        showToast('删除失败', 'error');
-    }
-}
+// 已迁移至 assets/js/attachments.js
 
 // 加载统计信息
 async function loadStats() {
@@ -3429,39 +3370,69 @@ async function loadStats() {
         
         if (result.data) {
             const stats = result.data;
+            const isGuest = !document.getElementById('vditorPublish');
             
             let html = '<div style="background: var(--sidebar-bg); border-radius: 12px; padding: 30px; box-shadow: var(--shadow);">';
-            html += '<h2 style="margin-bottom: 20px;">笔记统计</h2>';
+            html += '<h2 style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">笔记统计';
+            if (isGuest) {
+                html += '<span style="font-size: 12px; padding: 2px 8px; background: rgba(102, 126, 234, 0.15); color: var(--primary-color); border-radius: 4px; font-weight: normal;">仅公开</span>';
+            }
+            html += '</h2>';
             
             // 写作热图
             html += generateWritingHeatmap(stats.daily_stats);
             
             html += '<div class="stats-grid">';
+            // 使用天数
             html += `
                 <div class="stat-card">
                     <div class="stat-number">${stats.usage_days || 0}</div>
                     <div class="stat-label">使用天数</div>
                 </div>
+            `;
+            // 记录天数
+            html += `
                 <div class="stat-card">
                     <div class="stat-number">${stats.record_days || 0}</div>
                     <div class="stat-label">记录天数</div>
                 </div>
+            `;
+            // 连续记录（游客不显示）
+            if (!isGuest && typeof stats.consecutive_days !== 'undefined') {
+                html += `
                 <div class="stat-card">
                     <div class="stat-number">${stats.consecutive_days || 0}</div>
                     <div class="stat-label">连续记录</div>
                 </div>
+                `;
+            }
+            // 总笔记数
+            html += `
                 <div class="stat-card">
                     <div class="stat-number">${stats.total_memos}</div>
                     <div class="stat-label">总笔记数</div>
                 </div>
+            `;
+            // 总标签数（游客不显示）
+            if (!isGuest && typeof stats.total_tags !== 'undefined') {
+                html += `
                 <div class="stat-card">
                     <div class="stat-number">${stats.total_tags}</div>
                     <div class="stat-label">总标签数</div>
                 </div>
+                `;
+            }
+            // 总附件数（游客不显示）
+            if (!isGuest && typeof stats.total_attachments !== 'undefined') {
+                html += `
                 <div class="stat-card">
                     <div class="stat-number">${stats.total_attachments}</div>
                     <div class="stat-label">总附件数</div>
                 </div>
+                `;
+            }
+            // 本周/本月/本年新增
+            html += `
                 <div class="stat-card">
                     <div class="stat-number">${stats.week_memos}</div>
                     <div class="stat-label">本周新增</div>
@@ -3477,8 +3448,8 @@ async function loadStats() {
             `;
             html += '</div>';
             
-            // 标签统计
-            if (stats.tag_stats && stats.tag_stats.length > 0) {
+            // 标签统计（仅登录显示且接口返回时）
+            if (!isGuest && stats.tag_stats && stats.tag_stats.length > 0) {
                 html += '<h3 style="margin-bottom: 15px;">热门标签</h3>';
                 html += '<div style="display: flex; flex-wrap: wrap; gap: 10px;">';
                 stats.tag_stats.forEach(tag => {
@@ -5001,55 +4972,23 @@ function addCopyButtonsToCodeBlocks(container) {
     codeBlocks.forEach(codeBlock => {
         const pre = codeBlock.parentElement;
         
-        // 检查是否已经添加了复制按钮
-        if (pre.querySelector('.code-copy-btn')) {
+        // 检查是否已经处理过
+        if (pre.hasAttribute('data-lang-processed')) {
             return;
         }
         
         // 获取代码语言
         const language = getCodeLanguage(codeBlock);
         
-        // 创建代码块包装器
-        const wrapper = document.createElement('div');
-        wrapper.className = 'code-block-wrapper';
-        
-        // 创建头部
-        const header = document.createElement('div');
-        header.className = 'code-block-header';
-        
-        // 语言标签
+        // 给 pre 添加语言类名和 tabindex
         if (language) {
-            const langLabel = document.createElement('span');
-            langLabel.className = 'code-language';
-            langLabel.textContent = language;
-            header.appendChild(langLabel);
+            pre.classList.add('language-' + language);
         }
+        pre.setAttribute('tabindex', '0');
+        pre.setAttribute('data-lang-processed', 'true');
         
-        // 复制按钮
-        const copyBtn = document.createElement('button');
-        copyBtn.className = 'code-copy-btn';
-        copyBtn.innerHTML = `
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-            复制
-        `;
-        
-        copyBtn.addEventListener('click', function() {
-            copyCodeToClipboard(codeBlock.textContent, copyBtn);
-        });
-        
-        header.appendChild(copyBtn);
-        wrapper.appendChild(header);
-        
-        // 替换原来的pre元素
-        pre.parentNode.insertBefore(wrapper, pre);
-        wrapper.appendChild(pre);
-        
-        // 重新应用代码高亮到新的代码块
+        // 重新应用代码高亮
         if (typeof Prism !== 'undefined') {
-            // 重新高亮
             Prism.highlightElement(codeBlock);
         }
     });
@@ -5077,43 +5016,7 @@ function getCodeLanguage(codeElement) {
 }
 
 // 复制代码到剪贴板
-async function copyCodeToClipboard(code, button) {
-    try {
-        await navigator.clipboard.writeText(code);
-        
-        // 显示复制成功状态
-        button.classList.add('copied');
-        
-        // 2秒后恢复原状
-        setTimeout(() => {
-            button.classList.remove('copied');
-        }, 2000);
-        
-    } catch (err) {
-        // 如果现代API失败，使用传统方法
-        const textArea = document.createElement('textarea');
-        textArea.value = code;
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-999999px';
-        textArea.style.top = '-999999px';
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        
-        try {
-            document.execCommand('copy');
-            button.classList.add('copied');
-            setTimeout(() => {
-                button.classList.remove('copied');
-            }, 2000);
-        } catch (err) {
-            console.error('复制失败:', err);
-            showToast('复制失败，请手动选择代码复制', 'warning');
-        }
-        
-        document.body.removeChild(textArea);
-    }
-}
+// copyCodeToClipboard 函数已删除 - 现在使用 Vditor 自带的复制功能
 
 // 清理空标签
 async function cleanupEmptyTags() {
@@ -7106,8 +7009,45 @@ async function setMemoVisibility(memoId, visibility) {
         if (result.success) {
             showToast(`文章权限已设置为${visibility === 'public' ? '公开' : '私有'}`, 'success');
             
-            // 重新加载文章列表以更新UI
-            loadMemos();
+            // 就地更新当前卡片，避免改变分页或跳页
+            const card = document.querySelector(`.memo-card[data-id="${memoId}"]`);
+            if (card) {
+                try {
+                    // 重新获取该笔记详情
+                    const memoResp = await fetch(`api.php?action=memo&id=${memoId}`);
+                    const memoData = await memoResp.json();
+                    if (memoData && memoData.data) {
+                        const newCard = createMemoCard(memoData.data);
+                        // 用新卡片替换旧卡片
+                        card.replaceWith(newCard);
+                    } else {
+                        // 退化处理：仅更新可见性徽章与菜单项文本
+                        const badge = card.querySelector('.visibility-badge');
+                        if (visibility === 'public') {
+                            if (!badge) {
+                                const headerLeft = card.querySelector('.memo-header-left');
+                                if (headerLeft) {
+                                    const span = document.createElement('span');
+                                    span.className = 'visibility-badge public';
+                                    span.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>公开';
+                                    headerLeft.appendChild(span);
+                                }
+                            } else {
+                                badge.classList.add('public');
+                                badge.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>公开';
+                            }
+                        } else if (badge) {
+                            badge.remove();
+                        }
+                        const more = card.querySelector(`#more-dropdown-${memoId}`);
+                        if (more) {
+                            more.innerHTML = more.innerHTML.replace(/设为公开|设为私有/g, visibility === 'public' ? '设为私有' : '设为公开');
+                        }
+                    }
+                } catch (e) {
+                    console.warn('更新卡片UI失败，保持当前视图不跳页', e);
+                }
+            }
         } else {
             showToast('设置权限失败：' + (result.error || '未知错误'), 'error');
         }
