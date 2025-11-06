@@ -388,8 +388,8 @@ function handleMemo($db, $method) {
         }
         
         $stmt = $db->prepare("
-            INSERT INTO memos (content, visibility, pinned) 
-            VALUES (?, ?, ?)
+            INSERT INTO memos (content, visibility, pinned, created_at, updated_at) 
+            VALUES (?, ?, ?, datetime('now', 'localtime'), datetime('now', 'localtime'))
         ");
         
         $visibility = isset($data['visibility']) ? $data['visibility'] : 'private';
@@ -443,7 +443,7 @@ function handleMemo($db, $method) {
         }
         
         if (!empty($fields)) {
-            $fields[] = "updated_at = CURRENT_TIMESTAMP";
+            $fields[] = "updated_at = datetime('now', 'localtime')";
             $params[] = $id;
             
             $sql = "UPDATE memos SET " . implode(', ', $fields) . " WHERE id = ?";
@@ -1483,7 +1483,7 @@ function handleChangePassword($db, $method) {
             
             // 更新密码
             $newPasswordHash = password_hash($newPassword, PASSWORD_DEFAULT);
-            $stmt = $db->prepare("UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmt = $db->prepare("UPDATE users SET password_hash = ?, updated_at = datetime('now', 'localtime') WHERE id = ?");
             $stmt->execute([$newPasswordHash, $userId]);
             
             response([
@@ -1527,20 +1527,20 @@ function handleUserPreferences($db, $method) {
             
             if ($isGuest) {
                 // 游客访问时，只返回全局设置（user_id IS NULL）
-                $stmt = $db->prepare("SELECT key, value FROM settings WHERE key IN ('items_per_page', 'max_memo_height', 'enable_image_compress', 'image_compress_quality', 'enable_smart_exif_detection') AND user_id IS NULL");
+                $stmt = $db->prepare("SELECT key, value FROM settings WHERE key IN ('items_per_page', 'max_memo_height', 'enable_image_compress', 'image_compress_quality', 'enable_smart_exif_detection', 'date_display_format') AND user_id IS NULL");
                 $stmt->execute();
                 $settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
                 
                 // 如果数据库中没有全局设置，尝试获取任意设置（兼容旧版本数据库）
                 if (empty($settings)) {
-                    $stmt = $db->prepare("SELECT key, value FROM settings WHERE key IN ('items_per_page', 'max_memo_height', 'enable_image_compress', 'image_compress_quality', 'enable_smart_exif_detection') LIMIT 5");
+                    $stmt = $db->prepare("SELECT key, value FROM settings WHERE key IN ('items_per_page', 'max_memo_height', 'enable_image_compress', 'image_compress_quality', 'enable_smart_exif_detection', 'date_display_format') LIMIT 6");
                     $stmt->execute();
                     $settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
                 }
             } else {
                 // 登录用户访问时，获取用户的偏好设置（优先用户设置，其次全局设置）
                 $userId = $_SESSION['user_id'];
-                $stmt = $db->prepare("SELECT key, value FROM settings WHERE key IN ('items_per_page', 'max_memo_height', 'enable_image_compress', 'image_compress_quality', 'enable_smart_exif_detection') AND (user_id = ? OR user_id IS NULL)");
+                $stmt = $db->prepare("SELECT key, value FROM settings WHERE key IN ('items_per_page', 'max_memo_height', 'enable_image_compress', 'image_compress_quality', 'enable_smart_exif_detection', 'date_display_format') AND (user_id = ? OR user_id IS NULL)");
                 $stmt->execute([$userId]);
                 $settings = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
             }
@@ -1552,7 +1552,8 @@ function handleUserPreferences($db, $method) {
                     'max_memo_height' => isset($settings['max_memo_height']) ? (int)$settings['max_memo_height'] : 0,
                     'enable_image_compress' => isset($settings['enable_image_compress']) ? (int)$settings['enable_image_compress'] : 0,
                     'image_compress_quality' => isset($settings['image_compress_quality']) ? (float)$settings['image_compress_quality'] : 0.8,
-                    'enable_smart_exif_detection' => isset($settings['enable_smart_exif_detection']) ? (int)$settings['enable_smart_exif_detection'] : 0
+                    'enable_smart_exif_detection' => isset($settings['enable_smart_exif_detection']) ? (int)$settings['enable_smart_exif_detection'] : 0,
+                    'date_display_format' => isset($settings['date_display_format']) ? $settings['date_display_format'] : 'relative'
                 ]
             ]);
             
@@ -1652,6 +1653,28 @@ function handleUserPreferences($db, $method) {
                 // 插入新设置
                 $stmt = $db->prepare("INSERT INTO settings (key, value, user_id) VALUES ('enable_smart_exif_detection', ?, ?)");
                 $stmt->execute([$enableSmartDetection, $userId]);
+            }
+            
+            // 保存日期显示格式
+            if (isset($input['date_display_format'])) {
+                $dateDisplayFormat = $input['date_display_format'];
+                
+                // 验证值
+                if (!in_array($dateDisplayFormat, ['relative', 'absolute'])) {
+                    response([
+                        'success' => false,
+                        'error' => '无效的日期显示格式'
+                    ], 400);
+                    return;
+                }
+                
+                // 删除旧设置
+                $stmt = $db->prepare("DELETE FROM settings WHERE key = 'date_display_format' AND user_id = ?");
+                $stmt->execute([$userId]);
+                
+                // 插入新设置
+                $stmt = $db->prepare("INSERT INTO settings (key, value, user_id) VALUES ('date_display_format', ?, ?)");
+                $stmt->execute([$dateDisplayFormat, $userId]);
             }
             
             response([
@@ -1783,7 +1806,7 @@ function handleChangeUsername($db, $method) {
             }
             
             // 更新用户名
-            $stmt = $db->prepare("UPDATE users SET username = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmt = $db->prepare("UPDATE users SET username = ?, updated_at = datetime('now', 'localtime') WHERE id = ?");
             $stmt->execute([$newUsername, $userId]);
             
             response([
@@ -2235,7 +2258,7 @@ function validateApiToken($db) {
     }
     
     // 更新最后使用时间
-    $updateStmt = $db->prepare("UPDATE api_tokens SET last_used_at = CURRENT_TIMESTAMP WHERE id = ?");
+    $updateStmt = $db->prepare("UPDATE api_tokens SET last_used_at = datetime('now', 'localtime') WHERE id = ?");
     $updateStmt->execute([$tokenData['id']]);
     
     return $tokenData;
@@ -2253,7 +2276,7 @@ function handleApiTokens($db, $method) {
         expires_at DATETIME,
         last_used_at DATETIME,
         is_active INTEGER DEFAULT 1,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME DEFAULT (datetime('now', 'localtime')),
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )");
     
@@ -2504,7 +2527,7 @@ function handleV1Memos($db, $method) {
             // 插入 memo
             $stmt = $db->prepare("
                 INSERT INTO memos (content, visibility, created_at, updated_at)
-                VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                VALUES (?, ?, datetime('now', 'localtime'), datetime('now', 'localtime'))
             ");
             $stmt->execute([$content, $dbVisibility]);
             $memoId = $db->lastInsertId();
@@ -2524,7 +2547,7 @@ function handleV1Memos($db, $method) {
                     $tagId = $tag['id'];
                 } else {
                     // 创建新标签
-                    $stmt = $db->prepare("INSERT INTO tags (name) VALUES (?)");
+                    $stmt = $db->prepare("INSERT INTO tags (name, created_at) VALUES (?, datetime('now', 'localtime'))");
                     $stmt->execute([$tagName]);
                     $tagId = $db->lastInsertId();
                 }

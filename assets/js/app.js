@@ -4034,6 +4034,25 @@ async function loadSettings() {
         html += '</div>';
         html += '</div>';
         
+        // 日期显示方式设置
+        html += '<div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-color);">';
+        const dateDisplayFormat = userPreferences.date_display_format || 'relative';
+        html += '<p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 8px;">文章发布日期显示方式</p>';
+        html += '<div style="display: flex; align-items: center; gap: 12px;">';
+        html += `
+            <select id="dateDisplayFormatSelect" 
+                    style="padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 14px; background: var(--background); color: var(--text-primary); cursor: pointer;">
+                <option value="relative" ${dateDisplayFormat === 'relative' ? 'selected' : ''}>相对时间（如：5分钟前）</option>
+                <option value="absolute" ${dateDisplayFormat === 'absolute' ? 'selected' : ''}>具体时间（如：2024/11/06 14:30:05）</option>
+            </select>
+            <button class="btn-primary" onclick="saveDateDisplayFormat()" style="padding: 8px 16px; font-size: 14px;">
+                保存
+            </button>
+            <span style="font-size: 13px; color: var(--text-muted);">默认: 相对时间</span>
+        `;
+        html += '</div>';
+        html += '</div>';
+        
         html += '</div>';
         html += '</div>';
         
@@ -4385,6 +4404,22 @@ function formatTime(datetime) {
     const now = new Date();
     const diff = now - date;
     
+    // 获取用户偏好的日期显示格式
+    const displayFormat = userPreferences.date_display_format || 'relative';
+    
+    if (displayFormat === 'absolute') {
+        // 绝对时间格式：yyyy/MM/dd HH:mm:ss
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+        
+        return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
+    }
+    
+    // 相对时间格式（默认）
     if (diff < 60000) {
         return '刚刚';
     } else if (diff < 3600000) {
@@ -5883,6 +5918,7 @@ window.userPreferences = {
     enable_image_compress: 0,
     image_compress_quality: 0.8,
     enable_smart_exif_detection: 0,
+    date_display_format: 'relative', // 'relative' 或 'absolute'
     loaded: false
 };
 let userPreferences = window.userPreferences; // 保持向后兼容
@@ -5905,6 +5941,7 @@ async function loadUserPreferences() {
             window.userPreferences.enable_image_compress = result.data.enable_image_compress || 0;
             window.userPreferences.image_compress_quality = result.data.image_compress_quality || 0.8;
             window.userPreferences.enable_smart_exif_detection = result.data.enable_smart_exif_detection || 0;
+            window.userPreferences.date_display_format = result.data.date_display_format || 'relative';
             window.userPreferences.loaded = true;
             console.log('用户偏好设置已加载:', window.userPreferences);
         } else {
@@ -5967,6 +6004,45 @@ async function saveItemsPerPage() {
 // 获取文章最大显示高度
 function getMaxMemoHeight() {
     return userPreferences.max_memo_height || 0;
+}
+
+// 保存日期显示格式
+async function saveDateDisplayFormat() {
+    const select = document.getElementById('dateDisplayFormatSelect');
+    const value = select.value;
+    
+    try {
+        const response = await fetch('api.php?action=user_preferences', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                date_display_format: value
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            window.userPreferences.date_display_format = value;
+            showToast('保存成功！刷新页面查看效果', 'success');
+            
+            // 刷新当前页面以显示新的时间格式
+            setTimeout(() => {
+                if (currentView === 'timeline') {
+                    currentPage = 1;
+                    hasMoreData = true;
+                    loadMemos('', false);
+                }
+            }, 500);
+        } else {
+            showToast('保存失败：' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('保存设置失败:', error);
+        showToast('保存失败：' + error.message, 'error');
+    }
 }
 
 // 保存文章最大显示高度

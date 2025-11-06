@@ -45,7 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['login'])) {
             $_SESSION['email'] = $user['email'];
             
             // 更新最后登录时间
-            $stmt = $db->prepare("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmt = $db->prepare("UPDATE users SET last_login = datetime('now', 'localtime') WHERE id = ?");
             $stmt->execute([$user['id']]);
             
             header('Location: index.php');

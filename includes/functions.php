@@ -77,7 +77,7 @@ function saveMemoTags($db, $memoId, $tags) {
         $tag = $stmt->fetch();
         
         if (!$tag) {
-            $stmt = $db->prepare("INSERT INTO tags (name) VALUES (?)");
+            $stmt = $db->prepare("INSERT INTO tags (name, created_at) VALUES (?, datetime('now', 'localtime'))");
             $stmt->execute([$tagName]);
             $tagId = $db->lastInsertId();
         } else {
